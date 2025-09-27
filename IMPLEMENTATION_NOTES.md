@@ -36,6 +36,10 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Summary:_ Surfaced API-provided relaxed-search warnings ahead of plotting so users understand when the query broadened before reviewing the spectra.
   - _Related Issues / Tickets:_ N/A
 
+- _Iteration:_ Spectral analysis app rebuild
+  - _Summary:_ Replaced the JWST-only tooling with a modular spectral analysis suite featuring CSV/FITS ingestion, Plotly visualisation, NIST line overlays, comparative analysis, session export, and a Streamlit UI scaffold.
+  - _Related Issues / Tickets:_ N/A
+
 ## Documentation URLs Consulted
 - _Iteration:_ Initial JWST viewer build
   - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
@@ -72,6 +76,13 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Additional References:_
     - https://outerspace.stsci.edu/display/MASTDOCS/Portal+Guide
 
+- _Iteration:_ Spectral analysis app rebuild
+  - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
+  - _Additional References:_
+    - https://specutils.readthedocs.io/en/stable/spectrum1d.html
+    - https://docs.streamlit.io/library/api-reference
+    - https://astroquery.readthedocs.io/en/latest/index.html
+
 
 ## Parsed Data Fields with Provenance
 - _Iteration:_ Initial JWST viewer build
@@ -101,6 +112,14 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Source:_ Existing MAST observation/product metadata returned by relaxed cone-search discovery.
   - _Field:_ No new fields; the change preserves previous provenance data while ensuring broader target search coverage.
   - _Usage:_ Allows the UI to populate existing panels when spectra are located via the fallback discovery path.
+
+
+- _Iteration:_ Spectral analysis app rebuild
+  - _Source:_ User-supplied ASCII/FITS metadata plus fallback NIST line samples.
+  - _Field:_ `SpectrumMetadata` (source, target, instrument, observation_date, description, extra) stored alongside each loaded spectrum.
+  - _Usage:_ Powers metadata tabs in the Streamlit UI and persists provenance in exported session manifests.
+  - _Field:_ `ReferenceLine` (element, wavelength, intensity, label) entries sourced from NIST queries or bundled fallbacks.
+  - _Usage:_ Rendered as Plotly vertical markers and included in session exports for reproducibility.
 
 
 ## Validation Steps
@@ -136,4 +155,8 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Relaxed search warning UX
   - _Checks Performed:_ Manually triggered a relaxed target fallback in the web UI and confirmed the warning banner appeared before the spectrum refreshed.
   - _Command Output / Evidence:_ Observed the relaxed-search message rendered in the banner with the existing plot updating afterward.
+
+- _Iteration:_ Spectral analysis app rebuild
+  - _Checks Performed:_ `pytest`
+  - _Command Output / Evidence:_ Test suite covering ingestion, analysis, plotting, NIST fallback, and export passes, validating the rebuilt architecture.
 
