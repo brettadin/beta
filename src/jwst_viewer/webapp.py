@@ -171,16 +171,7 @@ def _render_shell() -> str:
         }
 
         status.textContent = 'Fetching spectra…';
-        tableStatus.textContent = '';
-        warningBanner.textContent = '';
-        warningBanner.classList.add('hidden');
-        provenanceBody.innerHTML = '';
-        metadataBody.innerHTML = '';
         unitSelect.disabled = true;
-        spectraPayload = [];
-        spectraById.clear();
-        traceRegistry.clear();
-        Plotly.purge(plotElement);
 
         const params = new URLSearchParams();
         if (programId) params.set('program_id', programId);
@@ -198,20 +189,20 @@ def _render_shell() -> str:
           const payload = await response.json();
           handlePayload(payload);
           status.textContent = `Loaded ${payload.spectra.length} spectra.`;
-        } catch (error) {
-          console.error(error);
-          status.textContent = error.message || 'Failed to fetch spectra.';
-          const loadedCount = (payload.spectra || []).length;
-          status.textContent = `Loaded ${loadedCount} spectra.`;
           if (payload.warning) {
             warningBanner.textContent = payload.warning;
             warningBanner.classList.remove('hidden');
+          } else {
+            warningBanner.textContent = '';
+            warningBanner.classList.add('hidden');
           }
         } catch (error) {
           console.error(error);
-          status.textContent = error.message || 'Failed to fetch spectra.';
-          warningBanner.textContent = '';
-          warningBanner.classList.add('hidden');
+          const message = error instanceof Error ? error.message : (typeof error === 'string' ? error : null);
+          status.textContent = message || 'Failed to fetch spectra.';
+          if (spectraPayload.length > 0) {
+            unitSelect.disabled = false;
+          }
         }
       });
 
@@ -221,9 +212,15 @@ def _render_shell() -> str:
       });
 
       function handlePayload(payload) {
+        metadataBody.innerHTML = '';
+        provenanceBody.innerHTML = '';
+        spectraPayload = [];
+        spectraById.clear();
+        traceRegistry.clear();
+        Plotly.purge(plotElement);
+
         spectraPayload = payload.spectra || [];
         primarySpectrumId = payload.primary_spectrum_id || null;
-        spectraById.clear();
         spectraPayload.forEach((item) => spectraById.set(item.id, item));
 
         populateProvenance(payload.provenance_html || '');
