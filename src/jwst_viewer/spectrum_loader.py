@@ -46,6 +46,11 @@ class JWSTSpectrumLoader:
     def _apply_preferred_units(self, spectrum: Spectrum1D) -> Tuple[Spectrum1D, bool]:
         """Convert the spectrum into the preferred units while checking reversibility."""
 
+        original_flux_unit = spectrum.flux.unit
+        original_flux_values = np.array(spectrum.flux.value, copy=True)
+        original_spectral_axis_unit = spectrum.spectral_axis.unit
+        original_spectral_axis_values = np.array(spectrum.spectral_axis.value, copy=True)
+
         converted = spectrum
         if spectrum.flux.unit != self.preferred_flux_unit:
             converted = converted.to(unit=self.preferred_flux_unit)
@@ -55,18 +60,33 @@ class JWSTSpectrumLoader:
                 spectral_axis=converted.spectral_axis.to(self.preferred_wave_unit),
             )
 
-        verified = self._verify_round_trip(converted)
+        verified = self._verify_round_trip(
+            converted,
+            original_flux_unit=original_flux_unit,
+            original_flux_values=original_flux_values,
+            original_spectral_axis_unit=original_spectral_axis_unit,
+            original_spectral_axis_values=original_spectral_axis_values,
+        )
         return converted, verified
 
-    def _verify_round_trip(self, spectrum: Spectrum1D, *, atol: float = 1e-12) -> bool:
+    def _verify_round_trip(
+        self,
+        spectrum: Spectrum1D,
+        *,
+        original_flux_unit: u.Unit,
+        original_flux_values: np.ndarray,
+        original_spectral_axis_unit: u.Unit,
+        original_spectral_axis_values: np.ndarray,
+        atol: float = 1e-12,
+    ) -> bool:
         """Ensure unit conversions round-trip without numerical drift."""
 
-        flux_back = spectrum.flux.to(spectrum.flux.unit).value
-        spectral_back = spectrum.spectral_axis.to(spectrum.spectral_axis.unit).value
-        flux_original = spectrum.flux.value
-        spectral_original = spectrum.spectral_axis.value
-        flux_close = np.allclose(flux_back, flux_original, atol=atol, rtol=1e-9)
-        spectral_close = np.allclose(spectral_back, spectral_original, atol=atol, rtol=1e-9)
+        flux_back = spectrum.flux.to(original_flux_unit).value
+        spectral_back = spectrum.spectral_axis.to(original_spectral_axis_unit).value
+        flux_close = np.allclose(flux_back, original_flux_values, atol=atol, rtol=1e-9)
+        spectral_close = np.allclose(
+            spectral_back, original_spectral_axis_values, atol=atol, rtol=1e-9
+        )
         return bool(flux_close and spectral_close)
 
     def _extract_header_metadata(self, file_path: Path) -> Dict[str, Any]:
@@ -97,9 +117,20 @@ class JWSTSpectrumLoader:
 
         flux_unit = flux_unit or self.preferred_flux_unit
         spectral_axis_unit = spectral_axis_unit or self.preferred_wave_unit
+        original_flux_unit = spectrum.flux.unit
+        original_flux_values = np.array(spectrum.flux.value, copy=True)
+        original_spectral_axis_unit = spectrum.spectral_axis.unit
+        original_spectral_axis_values = np.array(spectrum.spectral_axis.value, copy=True)
+
         converted = Spectrum1D(
             flux=spectrum.flux.to(flux_unit),
             spectral_axis=spectrum.spectral_axis.to(spectral_axis_unit),
         )
-        verified = self._verify_round_trip(converted)
+        verified = self._verify_round_trip(
+            converted,
+            original_flux_unit=original_flux_unit,
+            original_flux_values=original_flux_values,
+            original_spectral_axis_unit=original_spectral_axis_unit,
+            original_spectral_axis_values=original_spectral_axis_values,
+        )
         return converted, verified
