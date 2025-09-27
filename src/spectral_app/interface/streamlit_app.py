@@ -48,10 +48,15 @@ def _render_sidebar() -> None:
             type=["csv", "txt", "tsv", "dat", "fits", "fit", "fts"],
             accept_multiple_files=True,
         )
+        existing_identifiers = {record.identifier for record in st.session_state.spectra}
         for file in uploaded or []:
+            if file.name in existing_identifiers:
+                st.info(f"Skipping already loaded spectrum {file.name}")
+                continue
             try:
                 record = _load_uploaded_file(file)
                 st.session_state.spectra.append(record)
+                existing_identifiers.add(record.identifier)
                 st.success(f"Loaded {file.name}")
             except Exception as exc:
                 st.error(f"Failed to load {file.name}: {exc}")
