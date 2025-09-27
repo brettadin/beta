@@ -21,3 +21,5 @@ The JWST spectral viewer can discover products by program identifier or by targe
 - Both arguments may be combined to further constrain results: `python -m jwst_viewer 2730 --target "WASP-39"`.
 
 At least one of the program identifier or `--target` flag must be supplied before the tool will query MAST.
+
+Within the generated HTML viewer you can narrow the Mission & Instrument table using the target filter and quickly plot the top-matching spectrum by pressing **Enter** or clicking the **Add first match** button.
