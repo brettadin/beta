@@ -153,3 +153,7 @@ def run() -> None:
     _init_state()
     _render_sidebar()
     _render_main_panel()
+
+
+if __name__ == "__main__":
+    run()
