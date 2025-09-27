@@ -32,6 +32,9 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Fetch failure UX resilience
   - _Summary:_ Deferred spectrum clearing until after a successful API response so prior plots and tables remain visible when a request fails, and surfaced errors without purging the existing view.
   - _Related Issues / Tickets:_ N/A
+- _Iteration:_ Relaxed search warning UX
+  - _Summary:_ Surfaced API-provided relaxed-search warnings ahead of plotting so users understand when the query broadened before reviewing the spectra.
+  - _Related Issues / Tickets:_ N/A
 
 ## Documentation URLs Consulted
 - _Iteration:_ Initial JWST viewer build
@@ -64,6 +67,10 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
   - _Additional References:_
     - https://astroquery.readthedocs.io/en/latest/mast/mast_obsquery.html
+- _Iteration:_ Relaxed search warning UX
+  - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
+  - _Additional References:_
+    - https://outerspace.stsci.edu/display/MASTDOCS/Portal+Guide
 
 
 ## Parsed Data Fields with Provenance
@@ -126,4 +133,7 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Fetch failure UX resilience
   - _Checks Performed:_ Manually forced a `404` from `/api/spectra` via browser devtools to confirm the previous spectrum and metadata stayed visible while an error banner appeared in the status text.
   - _Command Output / Evidence:_ Prior plot remained rendered with the new error message shown, verifying the UX regression fix.
+- _Iteration:_ Relaxed search warning UX
+  - _Checks Performed:_ Manually triggered a relaxed target fallback in the web UI and confirmed the warning banner appeared before the spectrum refreshed.
+  - _Command Output / Evidence:_ Observed the relaxed-search message rendered in the banner with the existing plot updating afterward.
 
