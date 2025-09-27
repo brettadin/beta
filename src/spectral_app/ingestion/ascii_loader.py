@@ -1,6 +1,7 @@
 """Utilities for loading spectra from ASCII/CSV files."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import IO, Dict, Iterable, Optional, Tuple
 
@@ -32,6 +33,9 @@ FLUX_PRIORITY = (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def _read_table(path: Path | str | IO[str]) -> Tuple[Dict[str, np.ndarray], str]:
     """Read a delimited text file into column-oriented arrays."""
     if isinstance(path, (str, Path)):
@@ -52,15 +56,22 @@ def _read_table(path: Path | str | IO[str]) -> Tuple[Dict[str, np.ndarray], str]
                 df = pd.read_csv(data_source, sep=None, engine="python", header=None, comment="#")
         df = df.dropna(axis=1, how="all")
         columns = list(df.columns.astype(str))
-        column_data = {}
+        column_data: Dict[str, np.ndarray] = {}
+        skipped_columns: list[str] = []
         for col in columns:
-            try:
-                column_data[col] = df[col].astype(float).to_numpy()
-            except (ValueError, TypeError) as exc:
-                raise ValueError(
-                    f"Column '{col}' could not be parsed as numeric. "
-                    "Please check for non-numeric values or stray headers."
-                ) from exc
+            numeric = pd.to_numeric(df[col], errors="coerce")
+            if numeric.isna().all():
+                skipped_columns.append(str(col))
+                continue
+            column_data[str(col)] = numeric.to_numpy(dtype=float)
+        if not column_data:
+            raise ValueError("No numeric columns detected in ASCII spectrum")
+        if skipped_columns:
+            logger.warning(
+                "Skipping non-numeric columns while parsing %s: %s",
+                source,
+                ", ".join(skipped_columns),
+            )
         return column_data, source
 
     # Fallback parser using numpy for environments without pandas.
@@ -89,18 +100,29 @@ def _read_table(path: Path | str | IO[str]) -> Tuple[Dict[str, np.ndarray], str]
     has_header = any(any(c.isalpha() for c in token) for token in header_tokens)
     data_rows = rows[1:] if has_header else rows
     columns = header_tokens if has_header else [f"col{i}" for i in range(len(header_tokens))]
-    column_data = {}
+    column_data: Dict[str, np.ndarray] = {}
+    skipped_columns: list[str] = []
     for idx, col in enumerate(columns):
-        try:
-            column_data[col] = np.array(
-                [float(row[idx]) for row in data_rows],
-                dtype=float,
-            )
-        except (ValueError, TypeError) as exc:
-            raise ValueError(
-                f"Column '{col}' could not be parsed as numeric. "
-                "Please check for non-numeric values or stray headers."
-            ) from exc
+        numeric_values: list[float] = []
+        non_numeric = False
+        for row in data_rows:
+            try:
+                numeric_values.append(float(row[idx]))
+            except (ValueError, TypeError, IndexError):
+                non_numeric = True
+                break
+        if non_numeric or not numeric_values:
+            skipped_columns.append(str(col))
+            continue
+        column_data[str(col)] = np.array(numeric_values, dtype=float)
+    if not column_data:
+        raise ValueError("No numeric columns detected in ASCII spectrum")
+    if skipped_columns:
+        logger.warning(
+            "Skipping non-numeric columns while parsing %s: %s",
+            source,
+            ", ".join(skipped_columns),
+        )
     return column_data, source
 
 
