@@ -28,3 +28,13 @@ filter, and continues with any matching products.
 At least one of the program identifier or `--target` flag must be supplied before the tool will query MAST.
 
 Within the generated HTML viewer you can narrow the Mission & Instrument table using the target filter and quickly plot the top-matching spectrum by pressing **Enter** or clicking the **Add first match** button.
+
+## Browser-based Explorer
+
+Launch a persistent web experience with:
+
+```
+python -m jwst_viewer.webapp --host 127.0.0.1 --port 8000
+```
+
+The site serves an interactive search form so you can query by program ID or target name without regenerating HTML files. Submit the form to fetch spectra, toggle between unit systems, review provenance, and add or remove traces directly from the page.
