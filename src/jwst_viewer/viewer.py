@@ -182,9 +182,13 @@ def render_viewer_html(
     th {{ background: #243244; }}
     a {{ color: #8bbfff; }}
     .panel-title {{ margin-top: 0; }}
-    .search-controls {{ display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; align-items: center; }}
+    .search-controls {{ display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; align-items: flex-start; }}
     .search-controls label {{ font-weight: 600; }}
-    .search-controls input[type="search"] {{ flex: 1 1 260px; padding: 0.5rem; border-radius: 4px; border: 1px solid #2a3848; background: #10141a; color: #edf2ff; }}
+    .search-actions {{ display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; width: 100%; }}
+    .search-actions input[type="search"] {{ flex: 1 1 260px; padding: 0.5rem; border-radius: 4px; border: 1px solid #2a3848; background: #10141a; color: #edf2ff; }}
+    .search-actions button {{ padding: 0.5rem 0.85rem; border-radius: 4px; border: 1px solid #2a3848; background: #243244; color: #edf2ff; cursor: pointer; font-weight: 600; }}
+    .search-actions button:hover {{ background: #2f4054; }}
+    .search-feedback {{ margin: 0; font-size: 0.9rem; color: #8bbfff; min-height: 1.1rem; }}
     .unit-toggle {{ margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center; }}
     .unit-toggle select {{ background: #10141a; color: #edf2ff; border: 1px solid #2a3848; border-radius: 4px; padding: 0.4rem 0.6rem; }}
     .no-results {{ font-style: italic; padding: 0.75rem 0; color: #b0bbcc; }}
@@ -224,7 +228,11 @@ def render_viewer_html(
       <h2 class=\"panel-title\">Mission &amp; Instrument Details</h2>
       <div class=\"search-controls\">
         <label for=\"metadata-search\">Filter by target name</label>
-        <input type=\"search\" id=\"metadata-search\" placeholder=\"Search targets...\" />
+        <div class=\"search-actions\">
+          <input type=\"search\" id=\"metadata-search\" placeholder=\"Search targets...\" />
+          <button type=\"button\" id=\"metadata-search-add\">Add first match</button>
+        </div>
+        <p id=\"metadata-search-feedback\" class=\"search-feedback\" aria-live=\"polite\"></p>
       </div>
       <table>
         <thead>
@@ -266,10 +274,26 @@ def render_viewer_html(
     const metadataBody = document.getElementById('metadata-body');
     const metadataEmpty = document.getElementById('metadata-empty');
     const unitSelect = document.getElementById('unit-mode');
+    const addFirstButton = document.getElementById('metadata-search-add');
+    const searchFeedback = document.getElementById('metadata-search-feedback');
 
     searchInput.addEventListener('input', () => {{
       syncMetadataTable();
+      setSearchFeedback('');
     }});
+
+    searchInput.addEventListener('keydown', (event) => {{
+      if (event.key === 'Enter') {{
+        event.preventDefault();
+        addFirstVisibleMatch();
+      }}
+    }});
+
+    if (addFirstButton) {{
+      addFirstButton.addEventListener('click', () => {{
+        addFirstVisibleMatch();
+      }});
+    }}
 
     unitSelect.addEventListener('change', (event) => {{
       const newMode = event.target.value === 'alternate' ? 'alternate' : 'primary';
@@ -312,6 +336,7 @@ def render_viewer_html(
         }}
         visibleCount += 1;
         const row = document.createElement('tr');
+        row.dataset.spectrumId = record['spectrum_id'] || '';
         addCell(row, record['Observation ID']);
         addCell(row, record['Program ID']);
         addCell(row, record['Instrument']);
@@ -323,6 +348,9 @@ def render_viewer_html(
         metadataBody.appendChild(row);
       }});
       metadataEmpty.hidden = visibleCount !== 0;
+      if (visibleCount === 0) {{
+        setSearchFeedback('No matching observations to add.');
+      }}
     }}
 
     function addCell(row, value) {{
@@ -382,6 +410,7 @@ def render_viewer_html(
       }}).then((indices) => {{
         traceRegistry.set(spectrumId, indices[0]);
         syncMetadataTable();
+        setSearchFeedback('Added spectrum ' + (payload.label || spectrumId) + ' to the plot.');
       }});
     }}
 
@@ -400,6 +429,31 @@ def render_viewer_html(
         }});
         syncMetadataTable();
       }});
+    }}
+
+    function addFirstVisibleMatch() {{
+      const firstRow = metadataBody.querySelector('tr');
+      if (!firstRow) {{
+        setSearchFeedback('No matching observations to add.');
+        return;
+      }}
+      const spectrumId = firstRow.dataset.spectrumId;
+      if (!spectrumId || !spectraById.has(spectrumId)) {{
+        setSearchFeedback('The first matching observation cannot be added automatically.');
+        return;
+      }}
+      if (traceRegistry.has(spectrumId)) {{
+        setSearchFeedback('The first matching observation is already plotted.');
+        return;
+      }}
+      addSpectrumTrace(spectrumId);
+    }}
+
+    function setSearchFeedback(message) {{
+      if (!searchFeedback) {{
+        return;
+      }}
+      searchFeedback.textContent = message;
     }}
   </script>
 </body>

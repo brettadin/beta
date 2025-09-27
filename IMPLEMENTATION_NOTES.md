@@ -14,6 +14,9 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Multi-product viewer enhancements
   - _Summary:_ Embedded mission metadata within the HTML output, added target filtering controls, and enabled Plotly trace toggling for multiple spectra loaded via the CLI.
   - _Related Issues / Tickets:_ N/A
+- _Iteration:_ Search-driven quick plotting
+  - _Summary:_ Added an "Add first match" control (and Enter-key shortcut) that filters mission metadata and plots the first visible spectrum directly from the search box.
+  - _Related Issues / Tickets:_ N/A
 
 ## Documentation URLs Consulted
 - _Iteration:_ Initial JWST viewer build
@@ -30,6 +33,9 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
   - _Additional References:_
     - https://astroquery.readthedocs.io/en/latest/mast/mast_obsquery.html
+- _Iteration:_ Search-driven quick plotting
+  - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
+  - _Additional References:_ N/A
 
 ## Parsed Data Fields with Provenance
 - _Iteration:_ Initial JWST viewer build
@@ -57,3 +63,6 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Multi-product viewer enhancements
   - _Checks Performed:_ `PYTHONPATH=src python -m jwst_viewer --help`
   - _Command Output / Evidence:_ CLI help confirms the entry point remains available after multi-spectrum wiring.
+- _Iteration:_ Search-driven quick plotting
+  - _Checks Performed:_ `PYTHONPATH=src python -m jwst_viewer --help`
+  - _Command Output / Evidence:_ Help text continues to render after wiring the new HTML search controls.
