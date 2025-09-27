@@ -1,16 +1,17 @@
 [project]
-name = "jwst-viewer"
+name = "spectral-analysis-app"
 version = "0.1.0"
-description = "JWST spectral viewer with MAST integration"
+description = "Interactive spectral analysis toolkit"
 authors = [{name = "Beta User"}]
 requires-python = ">=3.10"
 dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.2",
   "astroquery>=0.4.7",
   "astropy>=6.0",
   "specutils>=1.14",
   "plotly>=5.20",
-  "fastapi>=0.110",
-  "uvicorn>=0.27",
+  "streamlit>=1.32",
 ]
 
 [build-system]
