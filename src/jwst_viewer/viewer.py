@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from urllib.parse import quote
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import plotly.graph_objects as go
 from plotly.utils import PlotlyJSONEncoder
@@ -130,15 +130,22 @@ def _build_figure(serialized: Dict[str, Dict[str, object]]) -> go.Figure:
     return fig
 
 
-def render_viewer_html(
+def build_viewer_payload(
     spectra: Dict[str, Spectrum1D],
     *,
     metadata: Iterable[JWSTProductMetadata],
     header_metadata: Dict[str, Optional[str]],
     primary_spectrum_id: Optional[str] = None,
-    output_path: Optional[Path] = None,
-) -> str:
-    """Render the spectrum and metadata into a standalone HTML document."""
+    alternate_flux_unit: u.Unit = u.Unit("erg / (cm2 s Angstrom)"),
+    alternate_wave_unit: u.Unit = u.AA,
+) -> Tuple[
+    Dict[str, object],
+    List[Dict[str, object | None]],
+    List[Dict[str, object]],
+    str,
+    str,
+]:
+    """Prepare Plotly JSON payloads for the viewer UI."""
 
     if not spectra:
         raise ValueError("At least one spectrum is required to render the viewer.")
@@ -160,7 +167,12 @@ def render_viewer_html(
     selected_serialized: Optional[Dict[str, Dict[str, object]]] = None
     for product_id, spectrum in spectra.items():
         label = label_by_id.get(product_id, product_id)
-        serialized = _serialize_spectrum(spectrum, label=label)
+        serialized = _serialize_spectrum(
+            spectrum,
+            label=label,
+            alternate_flux_unit=alternate_flux_unit,
+            alternate_wave_unit=alternate_wave_unit,
+        )
         payload: Dict[str, object] = {
             "id": product_id,
             "label": label,
@@ -192,6 +204,43 @@ def render_viewer_html(
         """
         for key, value in header_metadata.items()
     )
+
+    return (
+        json.loads(figure_json),
+        metadata_rows,
+        serialized_spectra,
+        json.loads(primary_id_json),
+        provenance_rows,
+    )
+
+
+def render_viewer_html(
+    spectra: Dict[str, Spectrum1D],
+    *,
+    metadata: Iterable[JWSTProductMetadata],
+    header_metadata: Dict[str, Optional[str]],
+    primary_spectrum_id: Optional[str] = None,
+    output_path: Optional[Path] = None,
+) -> str:
+    """Render the spectrum and metadata into a standalone HTML document."""
+
+    (
+        figure_spec,
+        metadata_rows,
+        spectra_payload,
+        primary_spectrum,
+        provenance_rows,
+    ) = build_viewer_payload(
+        spectra,
+        metadata=metadata,
+        header_metadata=header_metadata,
+        primary_spectrum_id=primary_spectrum_id,
+    )
+
+    figure_json = json.dumps(figure_spec, cls=PlotlyJSONEncoder)
+    metadata_json = json.dumps(metadata_rows, cls=PlotlyJSONEncoder)
+    spectra_json = json.dumps(spectra_payload, cls=PlotlyJSONEncoder)
+    primary_id_json = json.dumps(primary_spectrum)
 
     html = f"""
 <!DOCTYPE html>

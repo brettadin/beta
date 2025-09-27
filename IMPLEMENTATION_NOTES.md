@@ -20,6 +20,12 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Program/target fallback search
   - _Summary:_ Logged and surfaced CLI warnings when an exact target/program match fails, then re-ran discovery with a relaxed target constraint so downloads can proceed when canonical names differ.
   - _Related Issues / Tickets:_ N/A
+- _Iteration:_ FastAPI web interface
+  - _Summary:_ Added a persistent FastAPI-powered site that exposes search controls for JWST spectra, reuses the Plotly viewer payloads, and responds with interactive metadata and provenance without regenerating static HTML.
+  - _Related Issues / Tickets:_ N/A
+- _Iteration:_ MAST resilience updates
+  - _Summary:_ Hardened the MAST discovery pipeline against transient outages and broadened target-only searches via cone lookups so star-name queries surface spectra when exact matches fail.
+  - _Related Issues / Tickets:_ N/A
 
 ## Documentation URLs Consulted
 - _Iteration:_ Initial JWST viewer build
@@ -43,6 +49,15 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
   - _Additional References:_
     - https://mast.stsci.edu/portal/Mashup/Clients/Mast/Portal.html
+- _Iteration:_ FastAPI web interface
+  - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
+  - _Additional References:_
+    - https://astroquery.readthedocs.io/en/latest/mast/mast_obsquery.html
+    - https://specutils.readthedocs.io/en/stable/spectrum1d.html
+- _Iteration:_ MAST resilience updates
+  - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
+  - _Additional References:_
+    - https://astroquery.readthedocs.io/en/latest/mast/mast_obsquery.html
 
 ## Parsed Data Fields with Provenance
 - _Iteration:_ Initial JWST viewer build
@@ -63,6 +78,14 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Source:_ N/A (no new data fields introduced; the change relaxes discovery queries only when necessary).
   - _Field:_ N/A
   - _Usage:_ N/A
+- _Iteration:_ FastAPI web interface
+  - _Source:_ MAST observations/product metadata plus JWST FITS headers parsed through the Specutils loader.
+  - _Field:_ Same provenance fields as the CLI viewer, now serialized through the API for the browser shell.
+  - _Usage:_ Returned via the `/api/spectra` endpoint to populate the mission table and provenance panel dynamically.
+- _Iteration:_ MAST resilience updates
+  - _Source:_ Existing MAST observation/product metadata returned by relaxed cone-search discovery.
+  - _Field:_ No new fields; the change preserves previous provenance data while ensuring broader target search coverage.
+  - _Usage:_ Allows the UI to populate existing panels when spectra are located via the fallback discovery path.
 
 ## Validation Steps
 - _Iteration:_ Initial JWST viewer build
@@ -80,3 +103,9 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Program/target fallback search
   - _Checks Performed:_ `PYTHONPATH=src python -m jwst_viewer --help`
   - _Command Output / Evidence:_ Help text prints successfully after surfacing relaxed-search warnings.
+- _Iteration:_ FastAPI web interface
+  - _Checks Performed:_ `PYTHONPATH=src python -m jwst_viewer.webapp --host 127.0.0.1 --port 8000 --help`
+  - _Command Output / Evidence:_ FastAPI launcher arguments render, confirming the server entry point.
+- _Iteration:_ MAST resilience updates
+  - _Checks Performed:_ `pytest`
+  - _Command Output / Evidence:_ Test suite passes, confirming spectrum conversions remain stable after the discovery updates.
