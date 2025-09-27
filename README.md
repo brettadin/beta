@@ -14,11 +14,16 @@ Each time you add or modify functionality:
 
 ## Command Line Usage
 
-The JWST spectral viewer can discover products by program identifier or by target name:
+The JWST spectral viewer can discover products by program identifier or by target name. Target names must match the canonical
+labels published in the [MAST Portal target resolver](https://mast.stsci.edu/portal/Mashup/Clients/Mast/Portal.html); MAST's
+Observations service only honors exact matches when both program ID and target are provided in the same query.
 
 - `python -m jwst_viewer 2730` — fetches spectra for program **2730** using the proposal identifier.
 - `python -m jwst_viewer --target "WASP-39"` — performs a name-based search, which is useful when the program ID is unknown.
 - Both arguments may be combined to further constrain results: `python -m jwst_viewer 2730 --target "WASP-39"`.
+
+If an exact target/program pair returns no spectra, the CLI broadens the search to the entire program, warns about the relaxed
+filter, and continues with any matching products.
 
 At least one of the program identifier or `--target` flag must be supplied before the tool will query MAST.
 

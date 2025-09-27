@@ -1,12 +1,16 @@
 """MAST client helpers for JWST data discovery and download."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from astroquery.mast import Observations  # type: ignore
 from astropy.table import Table
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -30,6 +34,13 @@ class JWSTMastClient:
 
     def __init__(self, download_dir: Path | str = "downloads") -> None:
         self.download_dir = Path(download_dir)
+        self._last_query_relaxed_message: Optional[str] = None
+
+    @property
+    def last_query_relaxed_message(self) -> Optional[str]:
+        """Return a human-readable description when the last query broadened."""
+
+        return self._last_query_relaxed_message
 
     def discover_observations(
         self,
@@ -154,12 +165,31 @@ class JWSTMastClient:
     ) -> tuple[Table, Table, List[Path], List[JWSTProductMetadata]]:
         """Full workflow: discover observations, filter spectral products, download, and collect metadata."""
 
+        self._last_query_relaxed_message = None
         observations = self.discover_observations(
             program_id=program_id,
             target_name=target_name,
             instrument_name=instrument_name,
             filters=filters,
         )
+        if len(observations) == 0 and program_id and target_name:
+            relaxed_message = (
+                "Exact target match '%s' within program %s returned no JWST observations; "
+                "broadening the search to all targets in that program."
+            )
+            message = relaxed_message % (target_name, program_id)
+            logger.warning(message)
+            self._last_query_relaxed_message = message
+            observations = self.discover_observations(
+                program_id=program_id,
+                instrument_name=instrument_name,
+                filters=filters,
+            )
+            if len(observations) == 0:
+                logger.warning(
+                    "Relaxed JWST search for program %s still returned no observations.",
+                    program_id,
+                )
         products = self.discover_products(observations)
         downloaded_paths = self.download_products(products, mrp_only=mrp_only, cache=cache)
         metadata = self.collect_metadata(observations, products, downloaded_paths)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -84,6 +85,9 @@ def main(argv: Optional[list[str]] = None) -> None:
         instrument_name=args.instrument,
         target_name=args.target if args.target else None,
     )
+
+    if client.last_query_relaxed_message:
+        print(f"WARNING: {client.last_query_relaxed_message}", file=sys.stderr)
 
     if not paths:
         parser.error(
