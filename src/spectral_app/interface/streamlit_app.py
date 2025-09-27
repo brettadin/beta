@@ -8,13 +8,13 @@ from typing import List
 
 import streamlit as st
 
-from ..analysis.comparative import compute_difference, compute_ratio
-from ..datafetch.nist import fetch_reference_lines
-from ..ingestion.ascii_loader import load_ascii_spectrum
-from ..ingestion.fits_loader import load_fits_spectrum
-from ..models import Annotation, ReferenceLine, SessionExport, SpectrumRecord
-from ..plotting.plotly_view import add_annotations, add_reference_lines, add_spectrum_trace, create_base_figure
-from ..utils.export import export_session
+from spectral_app.analysis.comparative import compute_difference, compute_ratio
+from spectral_app.datafetch.nist import fetch_reference_lines
+from spectral_app.ingestion.ascii_loader import load_ascii_spectrum
+from spectral_app.ingestion.fits_loader import load_fits_spectrum
+from spectral_app.models import Annotation, ReferenceLine, SessionExport, SpectrumRecord
+from spectral_app.plotting.plotly_view import add_annotations, add_reference_lines, add_spectrum_trace, create_base_figure
+from spectral_app.utils.export import export_session
 
 
 def _init_state() -> None:
