@@ -52,7 +52,15 @@ def _read_table(path: Path | str | IO[str]) -> Tuple[Dict[str, np.ndarray], str]
                 df = pd.read_csv(data_source, sep=None, engine="python", header=None, comment="#")
         df = df.dropna(axis=1, how="all")
         columns = list(df.columns.astype(str))
-        column_data = {col: df[col].astype(float).to_numpy() for col in columns}
+        column_data = {}
+        for col in columns:
+            try:
+                column_data[col] = df[col].astype(float).to_numpy()
+            except (ValueError, TypeError) as exc:
+                raise ValueError(
+                    f"Column '{col}' could not be parsed as numeric. "
+                    "Please check for non-numeric values or stray headers."
+                ) from exc
         return column_data, source
 
     # Fallback parser using numpy for environments without pandas.
@@ -81,8 +89,18 @@ def _read_table(path: Path | str | IO[str]) -> Tuple[Dict[str, np.ndarray], str]
     has_header = any(any(c.isalpha() for c in token) for token in header_tokens)
     data_rows = rows[1:] if has_header else rows
     columns = header_tokens if has_header else [f"col{i}" for i in range(len(header_tokens))]
-    array = np.array([[float(value) for value in row] for row in data_rows], dtype=float)
-    column_data = {col: array[:, idx] for idx, col in enumerate(columns)}
+    column_data = {}
+    for idx, col in enumerate(columns):
+        try:
+            column_data[col] = np.array(
+                [float(row[idx]) for row in data_rows],
+                dtype=float,
+            )
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                f"Column '{col}' could not be parsed as numeric. "
+                "Please check for non-numeric values or stray headers."
+            ) from exc
     return column_data, source
 
 
