@@ -1,9 +1,13 @@
 """Utilities for loading spectra from ASCII/CSV files."""
 from __future__ import annotations
 
+import json
 import logging
+import math
+from collections import defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import IO, Dict, Iterable, Optional, Tuple
+from typing import IO, Dict, Iterable, Iterator, List, Optional, Tuple
 
 import numpy as np
 from astropy import units as u
@@ -36,9 +40,159 @@ FLUX_PRIORITY = (
 
 logger = logging.getLogger(__name__)
 
+CHUNK_SIZE = 200_000
+DOWNSAMPLE_TIERS = (512, 2048, 8192)
 
-def _read_table(path: Path | str | IO[str]) -> Tuple[Dict[str, np.ndarray], str]:
-    """Read a delimited text file into column-oriented arrays."""
+
+@dataclass
+class ColumnStats:
+    """Streaming statistics for a numeric column."""
+
+    count: int = 0
+    sum: float = 0.0
+    sum_sq: float = 0.0
+    min: float = field(default_factory=lambda: float("inf"))
+    max: float = field(default_factory=lambda: float("-inf"))
+
+    def update(self, values: np.ndarray) -> None:
+        finite = values[np.isfinite(values)]
+        if finite.size == 0:
+            return
+        finite_min = float(finite.min())
+        finite_max = float(finite.max())
+        if self.count == 0:
+            self.min = finite_min
+            self.max = finite_max
+        else:
+            self.min = min(self.min, finite_min)
+            self.max = max(self.max, finite_max)
+        self.count += int(finite.size)
+        self.sum += float(finite.sum())
+        self.sum_sq += float(np.square(finite).sum())
+
+    def as_dict(self) -> Dict[str, float]:
+        if self.count == 0:
+            return {}
+        mean = self.sum / self.count
+        variance = max(self.sum_sq / self.count - mean**2, 0.0)
+        std = math.sqrt(variance)
+        return {
+            "count": float(self.count),
+            "min": float(self.min),
+            "max": float(self.max),
+            "mean": float(mean),
+            "std": float(std),
+        }
+
+
+class RowReservoir:
+    """Reservoir sampler maintaining downsample tiers for streaming data."""
+
+    def __init__(self, tiers: Iterable[int], seed: int = 0) -> None:
+        self._tiers: Dict[int, List[Dict[str, float]]] = {size: [] for size in tiers}
+        self._rng = np.random.default_rng(seed)
+        self._total_seen = 0
+
+    def add(self, row: Dict[str, float]) -> None:
+        if not row:
+            return
+        self._total_seen += 1
+        for size, bucket in self._tiers.items():
+            if len(bucket) < size:
+                bucket.append(dict(row))
+            else:
+                idx = int(self._rng.integers(0, self._total_seen))
+                if idx < size:
+                    bucket[idx] = dict(row)
+
+    def export(self) -> Dict[int, List[Dict[str, float]]]:
+        return {size: [dict(row) for row in rows] for size, rows in self._tiers.items()}
+
+
+class ChunkAccumulator:
+    """Accumulate columnar data and analytics while streaming chunks."""
+
+    def __init__(self, columns: Iterable[str]) -> None:
+        column_list = list(columns)
+        self.columns: List[str] = column_list
+        self.buffers: Dict[str, List[np.ndarray]] = {col: [] for col in column_list}
+        self.pending_nans: Dict[str, int] = defaultdict(int)
+        self.column_has_numeric: Dict[str, bool] = defaultdict(bool)
+        self.stats: Dict[str, ColumnStats] = {col: ColumnStats() for col in column_list}
+        self.reservoir = RowReservoir(DOWNSAMPLE_TIERS)
+        self.row_count: int = 0
+
+    def process_chunk(self, chunk: np.ndarray, columns: List[str]) -> None:
+        if chunk.size == 0:
+            return
+        chunk_len = chunk.shape[0]
+        self.row_count += chunk_len
+        finite_mask = np.isfinite(chunk)
+        for idx, col in enumerate(columns):
+            column_values = chunk[:, idx]
+            if np.any(finite_mask[:, idx]):
+                if self.pending_nans[col]:
+                    pending = np.full(self.pending_nans[col], np.nan, dtype=float)
+                    self.buffers[col].append(pending)
+                    self.pending_nans[col] = 0
+                self.buffers[col].append(column_values)
+                self.column_has_numeric[col] = True
+                self.stats[col].update(column_values)
+            else:
+                self.pending_nans[col] += chunk_len
+
+        for row_vals, row_mask in zip(chunk, finite_mask):
+            row_dict = {
+                columns[idx]: float(row_vals[idx])
+                for idx, keep in enumerate(row_mask)
+                if keep
+            }
+            if len(row_dict) >= 2:
+                self.reservoir.add(row_dict)
+
+    def finalize(
+        self,
+    ) -> Tuple[
+        Dict[str, np.ndarray],
+        List[str],
+        Dict[str, Dict[str, float]],
+        Dict[int, List[Dict[str, float]]],
+        int,
+    ]:
+        column_data: Dict[str, np.ndarray] = {}
+        skipped_columns: List[str] = []
+        for col in self.columns:
+            if self.column_has_numeric[col]:
+                if self.pending_nans[col]:
+                    pending = np.full(self.pending_nans[col], np.nan, dtype=float)
+                    self.buffers[col].append(pending)
+                    self.pending_nans[col] = 0
+                column_data[col] = np.concatenate(self.buffers[col], dtype=float)
+            else:
+                skipped_columns.append(col)
+        stats = {
+            col: data
+            for col, data in ((col, self.stats[col].as_dict()) for col in self.columns)
+            if data
+        }
+        return column_data, skipped_columns, stats, self.reservoir.export(), self.row_count
+
+
+def _rewind_if_possible(handle: IO[str]) -> None:
+    if hasattr(handle, "seek"):
+        handle.seek(0)
+
+
+def _iter_clean_lines(stream: IO[str]) -> Iterator[str]:
+    for line in stream:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        yield stripped
+
+
+def _read_table(path: Path | str | IO[str]) -> Tuple[Dict[str, np.ndarray], str, Dict[str, object]]:
+    """Read a delimited text file into column-oriented arrays with analytics."""
     if isinstance(path, (str, Path)):
         source = str(path)
         data_source = path
@@ -47,24 +201,45 @@ def _read_table(path: Path | str | IO[str]) -> Tuple[Dict[str, np.ndarray], str]
         data_source = path
 
     if pd is not None:
+        read_kwargs: Dict[str, object] = {"comment": "#"}
         try:
-            df = pd.read_csv(data_source, sep=None, engine="python", comment="#")
+            sample = pd.read_csv(data_source, sep=None, engine="python", nrows=5, **read_kwargs)
+            delimiter_mode = "inferred"
         except pd.errors.ParserError:
-            df = pd.read_csv(data_source, delim_whitespace=True, comment="#")
-        if df.columns.tolist() == list(range(len(df.columns))):
-            first_row = df.iloc[0]
-            if not np.all(pd.to_numeric(first_row, errors="coerce").notna()):
-                df = pd.read_csv(data_source, sep=None, engine="python", header=None, comment="#")
-        df = df.dropna(axis=1, how="all")
-        columns = list(df.columns.astype(str))
-        column_data: Dict[str, np.ndarray] = {}
-        skipped_columns: list[str] = []
-        for col in columns:
-            numeric = pd.to_numeric(df[col], errors="coerce")
-            if numeric.isna().all():
-                skipped_columns.append(str(col))
-                continue
-            column_data[str(col)] = numeric.to_numpy(dtype=float)
+            sample = pd.read_csv(data_source, delim_whitespace=True, nrows=5, **read_kwargs)
+            delimiter_mode = "whitespace"
+
+        header_option: Optional[int] | str = "infer"
+        sample_columns = list(sample.columns)
+        if sample_columns == list(range(len(sample_columns))):
+            first_row = sample.iloc[0] if not sample.empty else None
+            if first_row is not None and not np.all(pd.to_numeric(first_row, errors="coerce").notna()):
+                header_option = None
+
+        if not isinstance(data_source, (str, Path)):
+            _rewind_if_possible(data_source)  # type: ignore[arg-type]
+
+        iterator_kwargs = dict(read_kwargs)
+        if delimiter_mode == "inferred":
+            iterator_kwargs.update({"sep": None, "engine": "python"})
+        else:
+            iterator_kwargs.update({"delim_whitespace": True})
+        if header_option != "infer":
+            iterator_kwargs["header"] = header_option
+
+        reader = pd.read_csv(data_source, chunksize=CHUNK_SIZE, **iterator_kwargs)
+
+        accumulator: Optional[ChunkAccumulator] = None
+        skipped_columns: List[str] = []
+        for chunk in reader:
+            chunk_columns = [str(col) for col in chunk.columns]
+            if accumulator is None:
+                accumulator = ChunkAccumulator(chunk_columns)
+            numeric_chunk = chunk.apply(pd.to_numeric, errors="coerce")
+            accumulator.process_chunk(numeric_chunk.to_numpy(dtype=float), chunk_columns)
+        if accumulator is None:
+            raise ValueError("No data rows detected in ASCII spectrum")
+        column_data, skipped_columns, stats, reservoirs, row_count = accumulator.finalize()
         if not column_data:
             raise ValueError("No numeric columns detected in ASCII spectrum")
         if skipped_columns:
@@ -73,58 +248,97 @@ def _read_table(path: Path | str | IO[str]) -> Tuple[Dict[str, np.ndarray], str]
                 source,
                 ", ".join(skipped_columns),
             )
-        return column_data, source
+        analytics = {
+            "column_statistics": stats,
+            "reservoirs": reservoirs,
+            "row_count": row_count,
+        }
+        return column_data, source, analytics
 
     # Fallback parser using numpy for environments without pandas.
-    import re
     import csv
+    import re
 
     if isinstance(data_source, (str, Path)):
-        text = Path(data_source).read_text()
+        stream: IO[str] = open(data_source, "r", encoding="utf-8")
+        close_stream = True
     else:
-        text = data_source.read()
-        if isinstance(text, bytes):
-            text = text.decode("utf-8")
+        stream = data_source  # type: ignore[assignment]
+        if hasattr(stream, "seek"):
+            stream.seek(0)  # type: ignore[arg-type]
+        close_stream = False
 
-    lines = [line for line in text.splitlines() if line.strip() and not line.strip().startswith("#")]
-    if not lines:
-        raise ValueError("No data rows detected in ASCII spectrum")
-    delimiter = "," if "," in lines[0] else ("\t" if "\t" in lines[0] else None)
-    if delimiter is None:
-        splitter = re.compile(r"\s+")
-        rows = [splitter.split(line.strip()) for line in lines]
-    else:
-        reader = csv.reader(lines, delimiter=delimiter)
-        rows = list(reader)
+    try:
+        cleaned_lines = _iter_clean_lines(stream)
+        try:
+            first_line = next(cleaned_lines)
+        except StopIteration as exc:  # pragma: no cover - empty file
+            raise ValueError("No data rows detected in ASCII spectrum") from exc
 
-    header_tokens = rows[0]
-    has_header = any(any(c.isalpha() for c in token) for token in header_tokens)
-    data_rows = rows[1:] if has_header else rows
-    columns = header_tokens if has_header else [f"col{i}" for i in range(len(header_tokens))]
-    column_data: Dict[str, np.ndarray] = {}
-    skipped_columns: list[str] = []
-    for idx, col in enumerate(columns):
-        numeric_values: list[float] = []
-        non_numeric = False
-        for row in data_rows:
+        delimiter = "," if "," in first_line else ("	" if "	" in first_line else None)
+        if delimiter is None:
+            splitter = re.compile(r"\s+")
+
+            def split_line(line: str) -> List[str]:
+                return splitter.split(line.strip())
+
+        else:
+            def split_line(line: str) -> List[str]:
+                reader = csv.reader([line], delimiter=delimiter)
+                return next(reader)
+
+        first_tokens = split_line(first_line)
+        has_header = any(any(c.isalpha() for c in token) for token in first_tokens)
+        if has_header:
+            columns = [str(token) for token in first_tokens]
+            initial_rows: List[List[str]] = []
+        else:
+            columns = [f"col{i}" for i in range(len(first_tokens))]
+            initial_rows = [first_tokens]
+
+        accumulator = ChunkAccumulator(columns)
+
+        chunk_rows: List[List[str]] = initial_rows
+        for line in cleaned_lines:
+            chunk_rows.append(split_line(line))
+            if len(chunk_rows) >= CHUNK_SIZE:
+                _process_fallback_chunk(chunk_rows, columns, accumulator)
+                chunk_rows = []
+        if chunk_rows:
+            _process_fallback_chunk(chunk_rows, columns, accumulator)
+
+        column_data, skipped_columns, stats, reservoirs, row_count = accumulator.finalize()
+        if not column_data:
+            raise ValueError("No numeric columns detected in ASCII spectrum")
+        if skipped_columns:
+            logger.warning(
+                "Skipping non-numeric columns while parsing %s: %s",
+                source,
+                ", ".join(skipped_columns),
+            )
+        analytics = {
+            "column_statistics": stats,
+            "reservoirs": reservoirs,
+            "row_count": row_count,
+        }
+        return column_data, source, analytics
+    finally:
+        if close_stream:
+            stream.close()
+
+
+def _process_fallback_chunk(rows: List[List[str]], columns: List[str], accumulator: ChunkAccumulator) -> None:
+    if not rows:
+        return
+    num_cols = len(columns)
+    array = np.full((len(rows), num_cols), np.nan, dtype=float)
+    for row_idx, row in enumerate(rows):
+        for col_idx in range(min(len(row), num_cols)):
             try:
-                numeric_values.append(float(row[idx]))
-            except (ValueError, TypeError, IndexError):
-                non_numeric = True
-                break
-        if non_numeric or not numeric_values:
-            skipped_columns.append(str(col))
-            continue
-        column_data[str(col)] = np.array(numeric_values, dtype=float)
-    if not column_data:
-        raise ValueError("No numeric columns detected in ASCII spectrum")
-    if skipped_columns:
-        logger.warning(
-            "Skipping non-numeric columns while parsing %s: %s",
-            source,
-            ", ".join(skipped_columns),
-        )
-    return column_data, source
+                array[row_idx, col_idx] = float(row[col_idx])
+            except (TypeError, ValueError):
+                continue
+    accumulator.process_chunk(array, columns)
 
 
 def _resolve_column(name_candidates: Iterable[str], columns: Iterable[str]) -> Optional[str]:
@@ -152,7 +366,7 @@ def _select_columns(columns: Iterable[str]) -> Tuple[str, str]:
 
 def load_ascii_spectrum(path: Path | str | IO[str], identifier: Optional[str] = None) -> SpectrumRecord:
     """Load a spectrum from an ASCII/CSV file and convert to canonical units."""
-    columns, source = _read_table(path)
+    columns, source, analytics = _read_table(path)
     wave_col, flux_col = _select_columns(columns.keys())
 
     wave_unit = infer_unit_from_label(str(wave_col)) or CANONICAL_WAVELENGTH_UNIT
@@ -195,6 +409,44 @@ def load_ascii_spectrum(path: Path | str | IO[str], identifier: Optional[str] = 
 
     spectrum = Spectrum(flux=canonical_flux, spectral_axis=canonical_wavelengths)
 
+    reservoirs = analytics.get("reservoirs", {}) if analytics else {}
+    downsampled: Dict[int, Dict[str, np.ndarray]] = {}
+    for size, rows in reservoirs.items():
+        wave_samples: List[float] = []
+        flux_samples: List[float] = []
+        for row in rows:
+            try:
+                wave_value = float(row[wave_col])
+                flux_value = float(row[flux_col])
+            except KeyError:
+                continue
+            if np.isnan(wave_value) or np.isnan(flux_value):
+                continue
+            wave_samples.append(wave_value)
+            flux_samples.append(flux_value)
+        if not wave_samples:
+            continue
+        sample_wavelengths = u.Quantity(wave_samples, unit=wave_unit).to(
+            CANONICAL_WAVELENGTH_UNIT
+        )
+        sample_flux = u.Quantity(flux_samples, unit=flux_unit)
+        try:
+            converted_flux = sample_flux.to(CANONICAL_FLUX_UNIT)
+        except UnitConversionError:
+            try:
+                converted_flux = sample_flux.to(
+                    CANONICAL_FLUX_UNIT,
+                    equivalencies=u.spectral_density(sample_wavelengths),
+                )
+            except UnitConversionError:
+                converted_flux = sample_flux
+        downsampled[size] = {
+            "wavelength": sample_wavelengths.value,
+            "flux": converted_flux.value,
+        }
+    if downsampled:
+        spectrum.meta["downsampled_tiers"] = downsampled
+
     flux_unit_label = (
         canonical_flux.unit.to_string()
         if hasattr(canonical_flux.unit, "to_string")
@@ -212,5 +464,17 @@ def load_ascii_spectrum(path: Path | str | IO[str], identifier: Optional[str] = 
             "flux_unit": flux_unit_label,
         },
     )
+
+    if analytics:
+        extra = dict(metadata.extra)
+        if analytics.get("row_count") is not None:
+            extra["row_count"] = str(analytics["row_count"])
+        column_stats = analytics.get("column_statistics")
+        if column_stats:
+            extra["column_statistics"] = json.dumps(column_stats)
+        if downsampled:
+            extra["downsample_tiers"] = ",".join(str(size) for size in sorted(downsampled))
+        metadata.extra = extra
+
     record = SpectrumRecord(identifier=identifier or Path(source).stem, spectrum=spectrum, metadata=metadata)
     return record
