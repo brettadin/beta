@@ -6,6 +6,7 @@ from typing import Dict, Optional
 
 from astropy.io import fits
 from astropy import units as u
+from astropy.units import UnitConversionError
 from specutils import Spectrum  # type: ignore
 
 from ..models import CANONICAL_FLUX_UNIT, CANONICAL_WAVELENGTH_UNIT, SpectrumMetadata, SpectrumRecord
@@ -29,7 +30,10 @@ def load_fits_spectrum(path: Path | str, identifier: Optional[str] = None) -> Sp
     spectrum = Spectrum.read(path)
 
     spectral_axis = spectrum.spectral_axis.to(CANONICAL_WAVELENGTH_UNIT)
-    flux = spectrum.flux.to(CANONICAL_FLUX_UNIT)
+    try:
+        flux = spectrum.flux.to(CANONICAL_FLUX_UNIT)
+    except UnitConversionError:
+        flux = spectrum.flux
     canonical = Spectrum(flux=flux, spectral_axis=spectral_axis)
 
     with fits.open(path) as hdul:

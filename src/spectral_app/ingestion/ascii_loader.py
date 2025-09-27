@@ -168,22 +168,49 @@ def load_ascii_spectrum(path: Path | str | IO[str], identifier: Optional[str] = 
         canonical_wavelengths = canonical_wavelengths[order]
         flux = flux[order]
         wave_values = canonical_wavelengths.value
-        deltas = np.diff(wave_values)
-        if np.any(deltas == 0):
+
+        unique_waves, inverse = np.unique(wave_values, return_inverse=True)
+        if unique_waves.size != wave_values.size:
+            flux_values = flux.value
+            summed_flux = np.zeros(unique_waves.size, dtype=flux_values.dtype)
+            counts = np.zeros_like(unique_waves, dtype=int)
+            np.add.at(summed_flux, inverse, flux_values)
+            np.add.at(counts, inverse, 1)
+            averaged_flux = summed_flux / counts
+            flux = averaged_flux * flux.unit
+            canonical_wavelengths = unique_waves * canonical_wavelengths.unit
+            wave_values = canonical_wavelengths.value
+
+        if np.any(np.diff(wave_values) <= 0):
             raise ValueError("Spectral axis must be strictly increasing or decreasing.")
 
     equivalencies = u.spectral_density(canonical_wavelengths)
     try:
         canonical_flux = flux.to(CANONICAL_FLUX_UNIT)
     except UnitConversionError:
-        canonical_flux = flux.to(CANONICAL_FLUX_UNIT, equivalencies=equivalencies)
+        try:
+            canonical_flux = flux.to(CANONICAL_FLUX_UNIT, equivalencies=equivalencies)
+        except UnitConversionError:
+            canonical_flux = flux
 
     spectrum = Spectrum(flux=canonical_flux, spectral_axis=canonical_wavelengths)
 
+    flux_unit_label = (
+        canonical_flux.unit.to_string()
+        if hasattr(canonical_flux.unit, "to_string")
+        else str(canonical_flux.unit)
+    )
+    if flux_unit_label in {"", "1"}:
+        flux_unit_label = "dimensionless"
     metadata = SpectrumMetadata(
         source=source,
         description="ASCII spectrum",
-        extra={"wave_column": wave_col, "flux_column": flux_col},
+        extra={
+            "wave_column": wave_col,
+            "flux_column": flux_col,
+            "wavelength_unit": wave_unit.to_string() if hasattr(wave_unit, "to_string") else str(wave_unit),
+            "flux_unit": flux_unit_label,
+        },
     )
     record = SpectrumRecord(identifier=identifier or Path(source).stem, spectrum=spectrum, metadata=metadata)
     return record
