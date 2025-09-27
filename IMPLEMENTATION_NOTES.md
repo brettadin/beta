@@ -17,6 +17,9 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Search-driven quick plotting
   - _Summary:_ Added an "Add first match" control (and Enter-key shortcut) that filters mission metadata and plots the first visible spectrum directly from the search box.
   - _Related Issues / Tickets:_ N/A
+- _Iteration:_ Program/target fallback search
+  - _Summary:_ Logged and surfaced CLI warnings when an exact target/program match fails, then re-ran discovery with a relaxed target constraint so downloads can proceed when canonical names differ.
+  - _Related Issues / Tickets:_ N/A
 
 ## Documentation URLs Consulted
 - _Iteration:_ Initial JWST viewer build
@@ -36,6 +39,10 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Search-driven quick plotting
   - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
   - _Additional References:_ N/A
+- _Iteration:_ Program/target fallback search
+  - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
+  - _Additional References:_
+    - https://mast.stsci.edu/portal/Mashup/Clients/Mast/Portal.html
 
 ## Parsed Data Fields with Provenance
 - _Iteration:_ Initial JWST viewer build
@@ -52,6 +59,10 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Source:_ MAST observation/product metadata returned by the Observations service and serialized Specutils spectra arrays.
   - _Field:_ Observation metadata augmented with spectrum identifiers for UI filtering and Plotly trace wiring.
   - _Usage:_ Drives the mission table search results and associates checkboxes with serialized spectra traces in the HTML payload.
+- _Iteration:_ Program/target fallback search
+  - _Source:_ N/A (no new data fields introduced; the change relaxes discovery queries only when necessary).
+  - _Field:_ N/A
+  - _Usage:_ N/A
 
 ## Validation Steps
 - _Iteration:_ Initial JWST viewer build
@@ -66,3 +77,6 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Search-driven quick plotting
   - _Checks Performed:_ `PYTHONPATH=src python -m jwst_viewer --help`
   - _Command Output / Evidence:_ Help text continues to render after wiring the new HTML search controls.
+- _Iteration:_ Program/target fallback search
+  - _Checks Performed:_ `PYTHONPATH=src python -m jwst_viewer --help`
+  - _Command Output / Evidence:_ Help text prints successfully after surfacing relaxed-search warnings.
