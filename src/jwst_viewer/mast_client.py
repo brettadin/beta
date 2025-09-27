@@ -10,6 +10,7 @@ from astroquery.exceptions import RemoteServiceError  # type: ignore
 from astroquery.mast import Observations  # type: ignore
 from astropy import units as u
 from astropy.table import Table
+import numpy as np
 from requests import exceptions as requests_exceptions
 
 
@@ -103,6 +104,23 @@ class JWSTMastClient:
                     cone_results["dataproduct_type"] == "spectrum"
                 )
                 observations = cone_results[jwst_mask]
+
+                # Apply the additional filtering that the original query would
+                # have performed so the fallback mirrors the user's intent.
+                if instrument_name and "instrument_name" in observations.colnames:
+                    observations = observations[
+                        observations["instrument_name"] == instrument_name
+                    ]
+
+                if filters:
+                    for key, value in filters.items():
+                        if key not in observations.colnames:
+                            continue
+                        allowed = value
+                        if not isinstance(allowed, (list, tuple, set)):
+                            allowed = [allowed]
+                        mask = np.isin(observations[key], list(allowed))
+                        observations = observations[mask]
             if len(observations) == 0:
                 logger.warning(
                     "JWST cone search for target %s returned no spectral products.",
