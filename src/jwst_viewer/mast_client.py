@@ -6,11 +6,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from astroquery.exceptions import RemoteServiceError  # type: ignore
 from astroquery.mast import Observations  # type: ignore
+from astropy import units as u
 from astropy.table import Table
+from requests import exceptions as requests_exceptions
 
 
 logger = logging.getLogger(__name__)
+
+
+class JWSTDiscoveryError(RuntimeError):
+    """Raised when a MAST discovery or download request fails."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
 
 
 @dataclass
@@ -67,7 +77,38 @@ class JWSTMastClient:
 
         # Usage follows the Observations query workflow documented at:
         # https://astroquery.readthedocs.io/en/latest/mast/mast_obsquery.html
-        observations = Observations.query_criteria(**query_args)
+        try:
+            observations = Observations.query_criteria(**query_args)
+        except (requests_exceptions.RequestException, RemoteServiceError) as exc:
+            raise JWSTDiscoveryError(f"MAST observation query failed: {exc}") from exc
+
+        if len(observations) == 0 and target_name and not program_id:
+            relaxed_message = (
+                "No JWST spectra matched target '%s'; broadening via cone search per astroquery docs."
+            )
+            message = relaxed_message % target_name
+            logger.warning(message)
+            self._last_query_relaxed_message = message
+            try:
+                # Fallback strategy aligns with the cone search guidance documented at:
+                # https://astroquery.readthedocs.io/en/latest/mast/mast_obsquery.html
+                cone_results = Observations.query_object(
+                    target_name,
+                    radius=0.2 * u.deg,
+                )
+            except (requests_exceptions.RequestException, RemoteServiceError) as exc:
+                raise JWSTDiscoveryError(f"MAST cone search failed: {exc}") from exc
+            if len(cone_results) > 0:
+                jwst_mask = (cone_results["obs_collection"] == "JWST") & (
+                    cone_results["dataproduct_type"] == "spectrum"
+                )
+                observations = cone_results[jwst_mask]
+            if len(observations) == 0:
+                logger.warning(
+                    "JWST cone search for target %s returned no spectral products.",
+                    target_name,
+                )
+
         return observations
 
     def discover_products(self, observations: Table) -> Table:
@@ -78,13 +119,16 @@ class JWSTMastClient:
 
         # The product listing/filters follow the documented pattern:
         # https://astroquery.readthedocs.io/en/latest/mast/mast.html#observation-products
-        product_list = Observations.get_product_list(observations)
-        spectral_products = Observations.filter_products(
-            product_list,
-            productType="SCIENCE",
-            productLevel="2",
-            extension="fits",
-        )
+        try:
+            product_list = Observations.get_product_list(observations)
+            spectral_products = Observations.filter_products(
+                product_list,
+                productType="SCIENCE",
+                productLevel="2",
+                extension="fits",
+            )
+        except (requests_exceptions.RequestException, RemoteServiceError) as exc:
+            raise JWSTDiscoveryError(f"MAST product query failed: {exc}") from exc
         return spectral_products
 
     def download_products(
@@ -98,12 +142,15 @@ class JWSTMastClient:
         self.download_dir.mkdir(parents=True, exist_ok=True)
         # Download helper per the MAST API examples:
         # https://mast.stsci.edu/api/v0/pyex.html
-        manifest = Observations.download_products(
-            products,
-            download_dir=str(self.download_dir),
-            mrp_only=mrp_only,
-            cache=cache,
-        )
+        try:
+            manifest = Observations.download_products(
+                products,
+                download_dir=str(self.download_dir),
+                mrp_only=mrp_only,
+                cache=cache,
+            )
+        except (requests_exceptions.RequestException, RemoteServiceError) as exc:
+            raise JWSTDiscoveryError(f"MAST download failed: {exc}") from exc
         if manifest is None:
             return []
 
