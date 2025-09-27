@@ -40,6 +40,10 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Summary:_ Replaced the JWST-only tooling with a modular spectral analysis suite featuring CSV/FITS ingestion, Plotly visualisation, NIST line overlays, comparative analysis, session export, and a Streamlit UI scaffold.
   - _Related Issues / Tickets:_ N/A
 
+- _Iteration:_ Spectrum API modernization
+  - _Summary:_ Migrated ingestion, analysis, and model layers from the deprecated `Spectrum1D` class to the new `specutils.Spectrum` API, updating construction sites, metadata bundling, and tests to align with the refreshed interface.
+  - _Related Issues / Tickets:_ N/A
+
 ## Documentation URLs Consulted
 - _Iteration:_ Initial JWST viewer build
   - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
@@ -82,6 +86,11 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
     - https://specutils.readthedocs.io/en/stable/spectrum1d.html
     - https://docs.streamlit.io/library/api-reference
     - https://astroquery.readthedocs.io/en/latest/index.html
+
+- _Iteration:_ Spectrum API modernization
+  - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
+  - _Additional References:_
+    - https://specutils.readthedocs.io/en/stable/spectrum.html
 
 
 ## Parsed Data Fields with Provenance
@@ -159,4 +168,8 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Spectral analysis app rebuild
   - _Checks Performed:_ `pytest`
   - _Command Output / Evidence:_ Test suite covering ingestion, analysis, plotting, NIST fallback, and export passes, validating the rebuilt architecture.
+
+- _Iteration:_ Spectrum API modernization
+  - _Checks Performed:_ `pytest`; `timeout 5 streamlit run src/spectral_app/interface/streamlit_app.py --server.headless true --server.port 8501`
+  - _Command Output / Evidence:_ Automated tests passed without spectrum deprecation warnings, and the Streamlit UI launched headlessly without emitting Spectrum migration warnings prior to the timed shutdown.
 

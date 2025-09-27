@@ -1,6 +1,6 @@
 import pytest
 from astropy import units as u
-from specutils import Spectrum1D
+from specutils import Spectrum
 
 from spectral_app.analysis.comparative import compute_difference, compute_ratio
 from spectral_app.models import SpectrumMetadata, SpectrumRecord
@@ -9,7 +9,7 @@ from spectral_app.models import SpectrumMetadata, SpectrumRecord
 def _make_record(identifier: str, flux_values):
     spectral_axis = u.Quantity([500, 510, 520], u.nm)
     flux = u.Quantity(flux_values, u.Jy)
-    spectrum = Spectrum1D(flux=flux, spectral_axis=spectral_axis)
+    spectrum = Spectrum(flux=flux, spectral_axis=spectral_axis)
     metadata = SpectrumMetadata(source=identifier, description="test")
     return SpectrumRecord(identifier=identifier, spectrum=spectrum, metadata=metadata)
 

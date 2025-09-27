@@ -1,5 +1,5 @@
 from astropy import units as u
-from specutils import Spectrum1D
+from specutils import Spectrum
 
 from spectral_app.ingestion.fits_loader import load_fits_spectrum
 
@@ -7,7 +7,7 @@ from spectral_app.ingestion.fits_loader import load_fits_spectrum
 def test_load_fits_spectrum(tmp_path):
     wave = [500, 510, 520] * u.nm
     flux = [1, 2, 3] * u.Jy
-    spectrum = Spectrum1D(flux=flux, spectral_axis=wave)
+    spectrum = Spectrum(flux=flux, spectral_axis=wave)
 
     path = tmp_path / "sample.fits"
     spectrum.write(path)

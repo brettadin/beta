@@ -1,7 +1,7 @@
 import json
 
 from astropy import units as u
-from specutils import Spectrum1D
+from specutils import Spectrum
 
 from spectral_app.models import Annotation, ReferenceLine, SessionExport, SpectrumMetadata, SpectrumRecord
 from spectral_app.utils.export import export_session
@@ -12,7 +12,7 @@ def test_export_session(tmp_path):
     flux = u.Quantity([1, 2], u.Jy)
     record = SpectrumRecord(
         identifier="sample",
-        spectrum=Spectrum1D(flux=flux, spectral_axis=spectral_axis),
+        spectrum=Spectrum(flux=flux, spectral_axis=spectral_axis),
         metadata=SpectrumMetadata(source="test"),
     )
     export = SessionExport(
