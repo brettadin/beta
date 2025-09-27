@@ -31,7 +31,7 @@ if not exist ".venv\Lib\site-packages\spectral_app.egg-link" (
     )
 )
 
-streamlit run -m spectral_app.interface.streamlit_app
+python -m streamlit run spectral_app/interface/streamlit_app.py
 
 popd >nul
 endlocal
