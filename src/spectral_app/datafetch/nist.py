@@ -12,9 +12,17 @@ _SAMPLE_LINES = {
         ReferenceLine("H", 656.281 * u.nm, 1.0, "Hα"),
         ReferenceLine("H", 486.133 * u.nm, 0.7, "Hβ"),
     ],
+    "He": [
+        ReferenceLine("He", 587.562 * u.nm, 0.6, "He I"),
+        ReferenceLine("He", 447.148 * u.nm, 0.4, "He I"),
+    ],
     "Na": [
         ReferenceLine("Na", 589.592 * u.nm, 0.8, "Na D2"),
         ReferenceLine("Na", 588.995 * u.nm, 0.7, "Na D1"),
+    ],
+    "C": [
+        ReferenceLine("C", 658.288 * u.nm, 0.5, "C II"),
+        ReferenceLine("C", 711.318 * u.nm, 0.3, "C I"),
     ],
 }
 

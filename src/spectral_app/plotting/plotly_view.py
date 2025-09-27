@@ -14,7 +14,7 @@ def create_base_figure(title: str = "Spectral Analysis") -> go.Figure:
     fig.update_layout(
         title=title,
         xaxis_title="Wavelength (nm)",
-        yaxis_title="Flux (Jy)",
+        yaxis_title="Flux",
         template="plotly_white",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
@@ -36,9 +36,15 @@ def add_spectrum_trace(
     max_points: Optional[int] = 5000,
     secondary_y: bool = False,
 ) -> None:
-    spectrum = record.to_canonical_units().spectrum
+    canonical_record = record.to_canonical_units()
+    spectrum = canonical_record.spectrum
     wavelengths = spectrum.spectral_axis.value
     flux = spectrum.flux.value
+    flux_unit = spectrum.flux.unit
+    flux_unit_label = flux_unit.to_string() if hasattr(flux_unit, "to_string") else str(flux_unit)
+    if flux_unit_label in {"", "1"}:
+        flux_unit_label = "dimensionless"
+    fig.update_yaxes(title=f"Flux ({flux_unit_label})")
     if max_points is not None:
         indices = _downsample(wavelengths, max_points)
         wavelengths = wavelengths[indices]
@@ -50,7 +56,7 @@ def add_spectrum_trace(
             name=record.identifier,
             mode="lines",
             line=dict(color=color),
-            hovertemplate="λ=%{x:.3f} nm<br>F=%{y:.3e} Jy",)
+            hovertemplate=f"λ=%{{x:.3f}} nm<br>F=%{{y:.3e}} {flux_unit_label}",)
     )
     if secondary_y:
         fig.update_layout(yaxis2=dict(title="Derived", overlaying="y", side="right"))

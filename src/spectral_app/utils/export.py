@@ -12,10 +12,15 @@ from ..models import Annotation, ReferenceLine, SessionExport, SpectrumRecord
 
 def _serialize_spectrum(record: SpectrumRecord) -> Dict[str, object]:
     canonical = record.to_canonical_units().spectrum
+    flux_unit = canonical.flux.unit
+    flux_unit_label = flux_unit.to_string() if hasattr(flux_unit, "to_string") else str(flux_unit)
+    if flux_unit_label in {"", "1"}:
+        flux_unit_label = "dimensionless"
     return {
         "id": record.identifier,
         "wavelength_nm": canonical.spectral_axis.value.tolist(),
-        "flux_jy": canonical.flux.value.tolist(),
+        "flux": canonical.flux.value.tolist(),
+        "flux_unit": flux_unit_label,
         "metadata": {
             "source": record.metadata.source,
             "target": record.metadata.target,
