@@ -1,6 +1,14 @@
-cd C:/Code3/beta 
-python -m venv .venv 
-.venv/Scripts/Activate.ps1
-C:\Code3\beta\.venv\Scripts\python.exe -m pip install --upgrade pip
-pip install -e . 
-python -m http.server 8501
+@echo off
+setlocal enabledelayedexpansion
+
+cd /d "%~dp0"
+
+if not exist ".venv\Scripts\activate.bat" (
+    python -m venv .venv
+)
+
+call ".venv\Scripts\activate.bat"
+
+pip install -e .
+
+streamlit run -m spectral_app.interface.streamlit_app
