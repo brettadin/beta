@@ -21,15 +21,24 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "EGG_LINK=.venv\Lib\site-packages\spectral_analysis_app.egg-link"
-set "DIST_INFO_PATTERN=.venv\Lib\site-packages\spectral_analysis_app-*.dist-info"
+set "EGG_LINK_UNDERSCORE=.venv\Lib\site-packages\spectral_analysis_app.egg-link"
+set "EGG_LINK_HYPHEN=.venv\Lib\site-packages\spectral-analysis-app.egg-link"
+set "DIST_INFO_PATTERN_UNDERSCORE=.venv\Lib\site-packages\spectral_analysis_app-*.dist-info"
+set "DIST_INFO_PATTERN_HYPHEN=.venv\Lib\site-packages\spectral-analysis-app-*.dist-info"
 
 set "INSTALL_NEEDED=1"
-if exist "%EGG_LINK%" (
+if exist "%EGG_LINK_UNDERSCORE%" (
+    set "INSTALL_NEEDED=0"
+) else if exist "%EGG_LINK_HYPHEN%" (
     set "INSTALL_NEEDED=0"
 ) else (
-    for /f "delims=" %%D in ('dir /b /ad "%DIST_INFO_PATTERN%" 2^>nul') do (
+    for /f "delims=" %%D in ('dir /b /ad "%DIST_INFO_PATTERN_UNDERSCORE%" 2^>nul') do (
         set "INSTALL_NEEDED=0"
+    )
+    if "!INSTALL_NEEDED!"=="1" (
+        for /f "delims=" %%D in ('dir /b /ad "%DIST_INFO_PATTERN_HYPHEN%" 2^>nul') do (
+            set "INSTALL_NEEDED=0"
+        )
     )
 )
 
