@@ -12,8 +12,18 @@ from spectral_app.analysis.comparative import compute_difference, compute_ratio
 from spectral_app.datafetch.nist import fetch_reference_lines
 from spectral_app.ingestion.ascii_loader import load_ascii_spectrum
 from spectral_app.ingestion.fits_loader import load_fits_spectrum
-from spectral_app.models import Annotation, ReferenceLine, SessionExport, SpectrumRecord
-from spectral_app.plotting.plotly_view import add_annotations, add_reference_lines, add_spectrum_trace, create_base_figure
+from spectral_app.models import (
+    Annotation,
+    ReferenceLine,
+    SessionExport,
+    SpectrumRecord,
+)
+from spectral_app.plotting.plotly_view import (
+    add_annotations,
+    add_reference_lines,
+    add_spectrum_trace,
+    create_base_figure,
+)
 from spectral_app.utils.export import export_session
 
 
