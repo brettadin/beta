@@ -13,8 +13,18 @@ from .viewer import render_viewer_html
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="JWST spectral viewer")
-    parser.add_argument("program_id", help="JWST program/proposal identifier")
+    parser = argparse.ArgumentParser(
+        description="JWST spectral viewer",
+        epilog=(
+            "Provide a JWST program identifier or use --target to resolve spectra by "
+            "target name. Supplying both will further narrow the query."
+        ),
+    )
+    parser.add_argument(
+        "program_id",
+        nargs="?",
+        help="JWST program/proposal identifier. Optional when --target is provided.",
+    )
     parser.add_argument(
         "--instrument",
         dest="instrument",
@@ -23,7 +33,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--target",
         dest="target",
-        help="Target name to narrow the query",
+        help=(
+            "Target name to narrow the query or to drive a name-based search when "
+            "no program ID is supplied."
+        ),
     )
     parser.add_argument(
         "--download-dir",
@@ -56,18 +69,23 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    if not args.program_id and not args.target:
+        parser.error("You must provide a JWST program ID or specify --target for a name-based search.")
+
     flux_unit = u.Unit(args.flux_unit)
     wave_unit = u.Unit(args.wave_unit)
 
     client = JWSTMastClient(download_dir=args.download_dir)
     observations, products, paths, metadata = client.discover_and_download(
-        program_id=args.program_id,
+        program_id=args.program_id if args.program_id else None,
         instrument_name=args.instrument,
-        target_name=args.target,
+        target_name=args.target if args.target else None,
     )
 
     if not paths:
-        parser.error("No spectral products were found for the specified query.")
+        parser.error(
+            "No spectral products were found for the supplied program ID/target search."
+        )
 
     loader = JWSTSpectrumLoader(preferred_flux_unit=flux_unit, preferred_wave_unit=wave_unit)
     bundle = loader.load(paths[0])

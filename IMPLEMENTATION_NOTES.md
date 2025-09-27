@@ -8,6 +8,9 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Initial JWST viewer build
   - _Summary:_ Added a modular JWST spectral viewer package with MAST discovery, Specutils-based parsing, Plotly interactivity, and provenance surfacing wired into the CLI entry point.
   - _Related Issues / Tickets:_ N/A
+- _Iteration:_ Optional program/target discovery
+  - _Summary:_ Allowed the CLI to resolve spectra via either program ID or target name and documented the name-based search workflow.
+  - _Related Issues / Tickets:_ N/A
 
 ## Documentation URLs Consulted
 - _Iteration:_ Initial JWST viewer build
@@ -17,6 +20,9 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
     - https://astroquery.readthedocs.io/en/latest/mast/mast.html#observation-products
     - https://mast.stsci.edu/api/v0/pyex.html
     - https://specutils.readthedocs.io/en/stable/spectrum1d.html#reading-from-files
+- _Iteration:_ Optional program/target discovery
+  - _Authoritative Source:_ `Training Documents/Reference Links for app v3.docx`
+  - _Additional References:_ N/A
 
 ## Parsed Data Fields with Provenance
 - _Iteration:_ Initial JWST viewer build
@@ -25,8 +31,15 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Usage:_ Displayed within the Mission & Instrument panel for provenance and linking back to MAST resources.
   - _Field:_ FITS header metadata (telescope, instrument, program, observation, visit, target, pipeline version).
   - _Usage:_ Rendered in the Citations / Provenance panel to expose product lineage and calibration context.
+- _Iteration:_ Optional program/target discovery
+  - _Source:_ Existing MAST metadata fields; no new data fields introduced.
+  - _Field:_ N/A
+  - _Usage:_ N/A
 
 ## Validation Steps
 - _Iteration:_ Initial JWST viewer build
   - _Checks Performed:_ `PYTHONPATH=src python -m jwst_viewer --help`
   - _Command Output / Evidence:_ Help text rendered confirming CLI wiring.
+- _Iteration:_ Optional program/target discovery
+  - _Checks Performed:_ `PYTHONPATH=src python -m jwst_viewer --help`
+  - _Command Output / Evidence:_ Help text now advertises optional program ID and target-based search path.

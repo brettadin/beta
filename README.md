@@ -11,3 +11,13 @@ Each time you add or modify functionality:
 3. Update the parsed data fields section with every new or modified field, including its provenance and usage.
 4. Document the commands or tests executed to validate the work, along with any pertinent output or evidence.
 5. Commit the updates to `IMPLEMENTATION_NOTES.md` alongside the code changes so the history remains synchronized with project development.
+
+## Command Line Usage
+
+The JWST spectral viewer can discover products by program identifier or by target name:
+
+- `python -m jwst_viewer 2730` — fetches spectra for program **2730** using the proposal identifier.
+- `python -m jwst_viewer --target "WASP-39"` — performs a name-based search, which is useful when the program ID is unknown.
+- Both arguments may be combined to further constrain results: `python -m jwst_viewer 2730 --target "WASP-39"`.
+
+At least one of the program identifier or `--target` flag must be supplied before the tool will query MAST.
