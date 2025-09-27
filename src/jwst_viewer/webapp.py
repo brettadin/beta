@@ -97,6 +97,7 @@ def _render_shell() -> str:
           <button type=\"submit\">Fetch spectra</button>
         </form>
         <p id=\"search-status\" class=\"status\"></p>
+        <p id=\"search-warning\" class=\"status hidden\"></p>
       </section>
       <section>
         <div class=\"unit-toggle\">
@@ -147,6 +148,7 @@ def _render_shell() -> str:
       const form = document.getElementById('search-form');
       const status = document.getElementById('search-status');
       const tableStatus = document.getElementById('table-status');
+      const warningBanner = document.getElementById('search-warning');
       const metadataBody = document.getElementById('metadata-body');
       const provenanceBody = document.getElementById('provenance-body');
       const unitSelect = document.getElementById('unit-mode');
@@ -167,6 +169,8 @@ def _render_shell() -> str:
 
         status.textContent = 'Fetching spectra…';
         tableStatus.textContent = '';
+        warningBanner.textContent = '';
+        warningBanner.classList.add('hidden');
         provenanceBody.innerHTML = '';
         metadataBody.innerHTML = '';
         unitSelect.disabled = true;
@@ -190,10 +194,17 @@ def _render_shell() -> str:
           }
           const payload = await response.json();
           handlePayload(payload);
-          status.textContent = `Loaded ${payload.spectra.length} spectra.`;
+          const loadedCount = (payload.spectra || []).length;
+          status.textContent = `Loaded ${loadedCount} spectra.`;
+          if (payload.warning) {
+            warningBanner.textContent = payload.warning;
+            warningBanner.classList.remove('hidden');
+          }
         } catch (error) {
           console.error(error);
           status.textContent = error.message || 'Failed to fetch spectra.';
+          warningBanner.textContent = '';
+          warningBanner.classList.add('hidden');
         }
       });
 
