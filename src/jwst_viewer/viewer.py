@@ -8,6 +8,7 @@ from typing import Dict, Iterable, List, Optional
 import plotly.graph_objects as go
 from plotly.utils import PlotlyJSONEncoder
 from astropy import units as u
+from astropy.units import UnitConversionError
 from specutils import Spectrum1D  # type: ignore
 
 from .mast_client import JWSTProductMetadata
@@ -35,9 +36,22 @@ def _build_figure(
     alternate_wave_unit: u.Unit = u.AA,
 ) -> go.Figure:
     wavelength_primary = spectrum.spectral_axis.to(spectrum.spectral_axis.unit)
-    flux_primary = spectrum.flux.to(spectrum.flux.unit)
+    spectral_equivalencies = u.spectral_density(spectrum.spectral_axis)
+    try:
+        flux_primary = spectrum.flux.to(
+            spectrum.flux.unit, equivalencies=spectral_equivalencies
+        )
+        flux_alt = spectrum.flux.to(
+            alternate_flux_unit, equivalencies=spectral_equivalencies
+        )
+    except UnitConversionError as exc:
+        raise UnitConversionError(
+            "Unable to convert spectrum flux to the requested units. "
+            "Ensure the flux units are compatible with the spectral axis "
+            "for spectral density conversions."
+        ) from exc
     wavelength_alt = spectrum.spectral_axis.to(alternate_wave_unit)
-    flux_alt = spectrum.flux.to(alternate_flux_unit)
+    # ``flux_alt`` is already computed with the proper equivalencies above.
 
     fig = go.Figure()
     fig.add_trace(
