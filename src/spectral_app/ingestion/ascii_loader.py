@@ -7,6 +7,7 @@ from typing import IO, Dict, Iterable, Optional, Tuple
 
 import numpy as np
 from astropy import units as u
+from astropy.units import UnitConversionError
 from specutils import Spectrum  # type: ignore
 
 try:  # Optional dependency for rich parsing
@@ -160,7 +161,24 @@ def load_ascii_spectrum(path: Path | str | IO[str], identifier: Optional[str] = 
     wavelengths = np.asarray(columns[wave_col], dtype=float) * wave_unit
     flux = np.asarray(columns[flux_col], dtype=float) * flux_unit
 
-    spectrum = Spectrum(flux=flux.to(CANONICAL_FLUX_UNIT), spectral_axis=wavelengths.to(CANONICAL_WAVELENGTH_UNIT))
+    canonical_wavelengths = wavelengths.to(CANONICAL_WAVELENGTH_UNIT)
+    wave_values = canonical_wavelengths.value
+    if len(wave_values) > 1:
+        order = np.argsort(wave_values)
+        canonical_wavelengths = canonical_wavelengths[order]
+        flux = flux[order]
+        wave_values = canonical_wavelengths.value
+        deltas = np.diff(wave_values)
+        if np.any(deltas == 0):
+            raise ValueError("Spectral axis must be strictly increasing or decreasing.")
+
+    equivalencies = u.spectral_density(canonical_wavelengths)
+    try:
+        canonical_flux = flux.to(CANONICAL_FLUX_UNIT)
+    except UnitConversionError:
+        canonical_flux = flux.to(CANONICAL_FLUX_UNIT, equivalencies=equivalencies)
+
+    spectrum = Spectrum(flux=canonical_flux, spectral_axis=canonical_wavelengths)
 
     metadata = SpectrumMetadata(
         source=source,
