@@ -86,6 +86,8 @@ def _render_sidebar() -> None:
                 except Exception as exc:
                     st.warning(f"Failed to fetch {element}: {exc}")
             st.session_state.reference_lines = lines
+        else:
+            st.session_state.reference_lines = []
 
         st.header("Analysis")
         if len(st.session_state.spectra) >= 2:
