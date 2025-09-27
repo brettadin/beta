@@ -23,6 +23,9 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ FastAPI web interface
   - _Summary:_ Added a persistent FastAPI-powered site that exposes search controls for JWST spectra, reuses the Plotly viewer payloads, and responds with interactive metadata and provenance without regenerating static HTML.
   - _Related Issues / Tickets:_ N/A
+- _Iteration:_ Threaded spectrum discovery
+  - _Summary:_ Routed the blocking MAST discovery/download and FITS parsing pipeline through FastAPI's threadpool helper so concurrent API requests no longer stall the event loop.
+  - _Related Issues / Tickets:_ N/A
 
 ## Documentation URLs Consulted
 - _Iteration:_ Initial JWST viewer build
@@ -95,3 +98,6 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ FastAPI web interface
   - _Checks Performed:_ `PYTHONPATH=src python -m jwst_viewer.webapp --host 127.0.0.1 --port 8000 --help`
   - _Command Output / Evidence:_ FastAPI launcher arguments render, confirming the server entry point.
+- _Iteration:_ Threaded spectrum discovery
+  - _Checks Performed:_ Manually issued overlapping `/api/spectra` requests via a browser and `curl` to verify they complete in parallel without stalling the UI.
+  - _Command Output / Evidence:_ Concurrent responses returned promptly with independent payloads, confirming the regression fix.
