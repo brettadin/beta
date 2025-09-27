@@ -60,8 +60,9 @@ def _render_sidebar() -> None:
         )
         existing_identifiers = {record.identifier for record in st.session_state.spectra}
         for file in uploaded or []:
-            if file.name in existing_identifiers:
-                st.info(f"Skipping already loaded spectrum {file.name}")
+            identifier = file.name
+            if identifier in existing_identifiers:
+                st.info(f"Skipping already loaded spectrum {identifier}")
                 continue
             try:
                 record = _load_uploaded_file(file)
