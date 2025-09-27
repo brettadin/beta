@@ -21,7 +21,19 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist ".venv\Lib\site-packages\spectral_app.egg-link" (
+set "EGG_LINK=.venv\Lib\site-packages\spectral_analysis_app.egg-link"
+set "DIST_INFO_PATTERN=.venv\Lib\site-packages\spectral_analysis_app-*.dist-info"
+
+set "INSTALL_NEEDED=1"
+if exist "%EGG_LINK%" (
+    set "INSTALL_NEEDED=0"
+) else (
+    for /f "delims=" %%D in ('dir /b /ad "%DIST_INFO_PATTERN%" 2^>nul') do (
+        set "INSTALL_NEEDED=0"
+    )
+)
+
+if "!INSTALL_NEEDED!"=="1" (
     echo Installing dependencies...
     pip install -e .
     if errorlevel 1 (
