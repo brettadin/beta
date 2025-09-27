@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 from astropy import units as u
+from astropy.units import UnitConversionError
 from astropy.io import fits
 from specutils import Spectrum1D  # type: ignore
 
@@ -122,9 +123,22 @@ class JWSTSpectrumLoader:
         original_spectral_axis_unit = spectrum.spectral_axis.unit
         original_spectral_axis_values = np.array(spectrum.spectral_axis.value, copy=True)
 
+        spectral_equivalencies = u.spectral_density(spectrum.spectral_axis)
+        try:
+            converted_flux = spectrum.flux.to(
+                flux_unit, equivalencies=spectral_equivalencies
+            )
+            converted_spectral_axis = spectrum.spectral_axis.to(spectral_axis_unit)
+        except UnitConversionError as exc:
+            raise UnitConversionError(
+                "Unable to convert spectrum to the requested units. "
+                "Ensure that the flux and spectral axis units are "
+                "physically compatible for spectral density conversions."
+            ) from exc
+
         converted = Spectrum1D(
-            flux=spectrum.flux.to(flux_unit),
-            spectral_axis=spectrum.spectral_axis.to(spectral_axis_unit),
+            flux=converted_flux,
+            spectral_axis=converted_spectral_axis,
         )
         verified = self._verify_round_trip(
             converted,
