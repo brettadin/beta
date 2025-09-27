@@ -29,6 +29,9 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Threaded spectrum discovery
   - _Summary:_ Routed the blocking MAST discovery/download and FITS parsing pipeline through FastAPI's threadpool helper so concurrent API requests no longer stall the event loop.
   - _Related Issues / Tickets:_ N/A
+- _Iteration:_ Fetch failure UX resilience
+  - _Summary:_ Deferred spectrum clearing until after a successful API response so prior plots and tables remain visible when a request fails, and surfaced errors without purging the existing view.
+  - _Related Issues / Tickets:_ N/A
 
 ## Documentation URLs Consulted
 - _Iteration:_ Initial JWST viewer build
@@ -120,4 +123,7 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ Threaded spectrum discovery
   - _Checks Performed:_ Manually issued overlapping `/api/spectra` requests via a browser and `curl` to verify they complete in parallel without stalling the UI.
   - _Command Output / Evidence:_ Concurrent responses returned promptly with independent payloads, confirming the regression fix.
+- _Iteration:_ Fetch failure UX resilience
+  - _Checks Performed:_ Manually forced a `404` from `/api/spectra` via browser devtools to confirm the previous spectrum and metadata stayed visible while an error banner appeared in the status text.
+  - _Command Output / Evidence:_ Prior plot remained rendered with the new error message shown, verifying the UX regression fix.
 
