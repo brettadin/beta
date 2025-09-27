@@ -53,11 +53,13 @@ class JWSTSpectrumLoader:
         original_spectral_axis_values = np.array(spectrum.spectral_axis.value, copy=True)
 
         converted = spectrum
-        spectral_equivalencies = None
+        spectral_equivalencies = u.spectral_density(spectrum.spectral_axis)
         if spectrum.flux.unit != self.preferred_flux_unit:
-            spectral_equivalencies = u.spectral_density(spectrum.spectral_axis)
-            converted = converted.to(
-                unit=self.preferred_flux_unit, equivalencies=spectral_equivalencies
+            converted = Spectrum1D(
+                flux=spectrum.flux.to(
+                    self.preferred_flux_unit, equivalencies=spectral_equivalencies
+                ),
+                spectral_axis=spectrum.spectral_axis,
             )
         if spectrum.spectral_axis.unit != self.preferred_wave_unit:
             converted = Spectrum1D(
