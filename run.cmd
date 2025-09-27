@@ -43,7 +43,8 @@ if "!INSTALL_NEEDED!"=="1" (
     )
 )
 
-python -m streamlit run spectral_app/interface/streamlit_app.py
+python -m streamlit run src/spectral_app/interface/streamlit_app.py
+set "STREAMLIT_EXIT_CODE=%ERRORLEVEL%"
 
 popd >nul
-endlocal
+endlocal & exit /b %STREAMLIT_EXIT_CODE%
