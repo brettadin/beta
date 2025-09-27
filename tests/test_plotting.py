@@ -1,6 +1,6 @@
 import pytest
 from astropy import units as u
-from specutils import Spectrum1D
+from specutils import Spectrum
 
 from spectral_app.models import SpectrumMetadata, SpectrumRecord
 from spectral_app.plotting.plotly_view import add_spectrum_trace, create_base_figure
@@ -11,7 +11,7 @@ def test_add_spectrum_trace():
     flux = u.Quantity([1, 2, 3], u.Jy)
     record = SpectrumRecord(
         identifier="sample",
-        spectrum=Spectrum1D(flux=flux, spectral_axis=spectral_axis),
+        spectrum=Spectrum(flux=flux, spectral_axis=spectral_axis),
         metadata=SpectrumMetadata(source="test"),
     )
 

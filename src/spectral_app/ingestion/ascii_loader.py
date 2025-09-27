@@ -6,7 +6,7 @@ from typing import IO, Dict, Iterable, Optional, Tuple
 
 import numpy as np
 from astropy import units as u
-from specutils import Spectrum1D  # type: ignore
+from specutils import Spectrum  # type: ignore
 
 try:  # Optional dependency for rich parsing
     import pandas as pd
@@ -138,7 +138,7 @@ def load_ascii_spectrum(path: Path | str | IO[str], identifier: Optional[str] = 
     wavelengths = np.asarray(columns[wave_col], dtype=float) * wave_unit
     flux = np.asarray(columns[flux_col], dtype=float) * flux_unit
 
-    spectrum = Spectrum1D(flux=flux.to(CANONICAL_FLUX_UNIT), spectral_axis=wavelengths.to(CANONICAL_WAVELENGTH_UNIT))
+    spectrum = Spectrum(flux=flux.to(CANONICAL_FLUX_UNIT), spectral_axis=wavelengths.to(CANONICAL_WAVELENGTH_UNIT))
 
     metadata = SpectrumMetadata(
         source=source,

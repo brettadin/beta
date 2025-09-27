@@ -6,7 +6,7 @@ from typing import Dict, Optional
 
 from astropy.io import fits
 from astropy import units as u
-from specutils import Spectrum1D  # type: ignore
+from specutils import Spectrum  # type: ignore
 
 from ..models import CANONICAL_FLUX_UNIT, CANONICAL_WAVELENGTH_UNIT, SpectrumMetadata, SpectrumRecord
 
@@ -26,11 +26,11 @@ def _extract_metadata(header: fits.Header) -> Dict[str, str]:
 
 def load_fits_spectrum(path: Path | str, identifier: Optional[str] = None) -> SpectrumRecord:
     """Load a 1D spectrum from a FITS file."""
-    spectrum = Spectrum1D.read(path)
+    spectrum = Spectrum.read(path)
 
     spectral_axis = spectrum.spectral_axis.to(CANONICAL_WAVELENGTH_UNIT)
     flux = spectrum.flux.to(CANONICAL_FLUX_UNIT)
-    canonical = Spectrum1D(flux=flux, spectral_axis=spectral_axis)
+    canonical = Spectrum(flux=flux, spectral_axis=spectral_axis)
 
     with fits.open(path) as hdul:
         header = hdul[0].header

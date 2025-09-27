@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from astropy import units as u
-from specutils import Spectrum1D  # type: ignore
+from specutils import Spectrum  # type: ignore
 
 
 CANONICAL_WAVELENGTH_UNIT = u.nm
@@ -27,17 +27,17 @@ class SpectrumMetadata:
 
 @dataclass
 class SpectrumRecord:
-    """Bundle tying a Spectrum1D instance to its metadata."""
+    """Bundle tying a Spectrum instance to its metadata."""
 
     identifier: str
-    spectrum: Spectrum1D
+    spectrum: Spectrum
     metadata: SpectrumMetadata
 
     def to_canonical_units(self) -> "SpectrumRecord":
         """Return a copy of the record in the canonical display units."""
         spectral_axis = self.spectrum.spectral_axis.to(CANONICAL_WAVELENGTH_UNIT)
         flux = self.spectrum.flux.to(CANONICAL_FLUX_UNIT)
-        canonical = Spectrum1D(flux=flux, spectral_axis=spectral_axis)
+        canonical = Spectrum(flux=flux, spectral_axis=spectral_axis)
         return SpectrumRecord(identifier=self.identifier, spectrum=canonical, metadata=self.metadata)
 
 
