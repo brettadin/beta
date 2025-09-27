@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 import uvicorn
 
@@ -389,39 +390,47 @@ async def fetch_spectra(
         raise HTTPException(status_code=400, detail=f"Invalid unit specification: {exc}")
 
     client = _build_client(Path(download_dir))
-    observations, products, paths, metadata = client.discover_and_download(
-        program_id=program_id,
-        instrument_name=instrument,
-        target_name=target,
+
+    def _download_and_parse():
+        observations, products, paths, metadata = client.discover_and_download(
+            program_id=program_id,
+            instrument_name=instrument,
+            target_name=target,
+        )
+
+        loader = _build_loader(flux, wave)
+        spectra: Dict[str, Spectrum1D] = {}
+        header_metadata: Dict[str, Optional[str]] = {}
+        primary_spectrum_id: Optional[str] = None
+
+        for index, path in enumerate(paths):
+            try:
+                bundle = loader.load(path)
+            except Exception as exc:  # pragma: no cover - defensive against FITS parsing issues
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to load spectrum '{path.name}': {exc}",
+                ) from exc
+            spectra[path.name] = bundle.spectrum
+            if index == 0:
+                header_metadata = {
+                    **{
+                        key: (str(value) if value is not None else None)
+                        for key, value in bundle.header_metadata.items()
+                    },
+                    "round_trip_verified": str(bundle.round_trip_verified),
+                    "primary_product": path.name,
+                }
+                primary_spectrum_id = path.name
+
+        return paths, metadata, spectra, header_metadata, primary_spectrum_id
+
+    paths, metadata, spectra, header_metadata, primary_spectrum_id = await run_in_threadpool(
+        _download_and_parse
     )
 
     if not paths:
         raise HTTPException(status_code=404, detail="No spectral products were found.")
-
-    loader = _build_loader(flux, wave)
-    spectra: Dict[str, Spectrum1D] = {}
-    header_metadata: Dict[str, Optional[str]] = {}
-    primary_spectrum_id: Optional[str] = None
-
-    for index, path in enumerate(paths):
-        try:
-            bundle = loader.load(path)
-        except Exception as exc:  # pragma: no cover - defensive against FITS parsing issues
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to load spectrum '{path.name}': {exc}",
-            ) from exc
-        spectra[path.name] = bundle.spectrum
-        if index == 0:
-            header_metadata = {
-                **{
-                    key: (str(value) if value is not None else None)
-                    for key, value in bundle.header_metadata.items()
-                },
-                "round_trip_verified": str(bundle.round_trip_verified),
-                "primary_product": path.name,
-            }
-            primary_spectrum_id = path.name
 
     figure_spec, metadata_rows, spectra_payload, primary_id, provenance_rows = build_viewer_payload(
         spectra,
