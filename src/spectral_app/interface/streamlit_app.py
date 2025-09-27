@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import tempfile
 from pathlib import Path
 from typing import List
@@ -27,6 +28,9 @@ from spectral_app.plotting.plotly_view import (
 from spectral_app.utils.export import export_session
 
 
+logger = logging.getLogger(__name__)
+
+
 def _init_state() -> None:
     if "spectra" not in st.session_state:
         st.session_state.spectra: List[SpectrumRecord] = []
@@ -47,7 +51,12 @@ def _load_uploaded_file(uploaded_file) -> SpectrumRecord:
         return record
     else:
         text = uploaded_file.getvalue().decode("utf-8")
-        return load_ascii_spectrum(io.StringIO(text), identifier=name)
+        try:
+            return load_ascii_spectrum(io.StringIO(text), identifier=name)
+        except ValueError as exc:
+            st.error(f"Failed to load {name}: {exc}")
+            logger.exception("Failed to load ASCII spectrum %s", name)
+            raise
 
 
 def _render_sidebar() -> None:
@@ -69,6 +78,8 @@ def _render_sidebar() -> None:
                 st.session_state.spectra.append(record)
                 existing_identifiers.add(record.identifier)
                 st.success(f"Loaded {file.name}")
+            except ValueError:
+                continue
             except Exception as exc:
                 st.error(f"Failed to load {file.name}: {exc}")
 
