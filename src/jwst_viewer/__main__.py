@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from astropy import units as u
+from specutils import Spectrum1D  # type: ignore
 
 from .mast_client import JWSTMastClient
 from .spectrum_loader import JWSTSpectrumLoader
@@ -76,6 +77,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     wave_unit = u.Unit(args.wave_unit)
 
     client = JWSTMastClient(download_dir=args.download_dir)
+    # The discovery+download workflow mirrors the Observations query guidance:
+    # https://astroquery.readthedocs.io/en/latest/mast/mast_obsquery.html
     observations, products, paths, metadata = client.discover_and_download(
         program_id=args.program_id if args.program_id else None,
         instrument_name=args.instrument,
@@ -88,18 +91,29 @@ def main(argv: Optional[list[str]] = None) -> None:
         )
 
     loader = JWSTSpectrumLoader(preferred_flux_unit=flux_unit, preferred_wave_unit=wave_unit)
-    bundle = loader.load(paths[0])
-
-    provenance: Dict[str, Optional[str]] = {
-        **{key: (str(value) if value is not None else None) for key, value in bundle.header_metadata.items()},
-        "round_trip_verified": str(bundle.round_trip_verified),
-        "primary_product": paths[0].name,
-    }
+    spectra: Dict[str, Spectrum1D] = {}
+    provenance: Dict[str, Optional[str]] = {}
+    primary_product_id: Optional[str] = None
+    for idx, path in enumerate(paths):
+        bundle = loader.load(path)
+        product_id = path.name
+        spectra[product_id] = bundle.spectrum
+        if idx == 0:
+            provenance = {
+                **{
+                    key: (str(value) if value is not None else None)
+                    for key, value in bundle.header_metadata.items()
+                },
+                "round_trip_verified": str(bundle.round_trip_verified),
+                "primary_product": product_id,
+            }
+            primary_product_id = product_id
 
     render_viewer_html(
-        bundle.spectrum,
+        spectra,
         metadata=metadata,
         header_metadata=provenance,
+        primary_spectrum_id=primary_product_id,
         output_path=Path(args.output_html),
     )
 
