@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 import uvicorn
 
@@ -13,6 +14,7 @@ from astropy import units as u
 from specutils import Spectrum1D  # type: ignore
 
 from .mast_client import JWSTMastClient, JWSTDiscoveryError
+from .mast_client import JWSTMastClient
 from .spectrum_loader import JWSTSpectrumLoader
 from .viewer import build_viewer_payload
 
@@ -97,6 +99,7 @@ def _render_shell() -> str:
           <button type=\"submit\">Fetch spectra</button>
         </form>
         <p id=\"search-status\" class=\"status\"></p>
+        <p id=\"search-warning\" class=\"status hidden\"></p>
       </section>
       <section>
         <div class=\"unit-toggle\">
@@ -147,6 +150,8 @@ def _render_shell() -> str:
       const form = document.getElementById('search-form');
       const status = document.getElementById('search-status');
       const tableStatus = document.getElementById('table-status');
+
+      const warningBanner = document.getElementById('search-warning');
       const metadataBody = document.getElementById('metadata-body');
       const provenanceBody = document.getElementById('provenance-body');
       const unitSelect = document.getElementById('unit-mode');
@@ -167,6 +172,8 @@ def _render_shell() -> str:
 
         status.textContent = 'Fetching spectra…';
         tableStatus.textContent = '';
+        warningBanner.textContent = '';
+        warningBanner.classList.add('hidden');
         provenanceBody.innerHTML = '';
         metadataBody.innerHTML = '';
         unitSelect.disabled = true;
@@ -194,6 +201,17 @@ def _render_shell() -> str:
         } catch (error) {
           console.error(error);
           status.textContent = error.message || 'Failed to fetch spectra.';
+          const loadedCount = (payload.spectra || []).length;
+          status.textContent = `Loaded ${loadedCount} spectra.`;
+          if (payload.warning) {
+            warningBanner.textContent = payload.warning;
+            warningBanner.classList.remove('hidden');
+          }
+        } catch (error) {
+          console.error(error);
+          status.textContent = error.message || 'Failed to fetch spectra.';
+          warningBanner.textContent = '';
+          warningBanner.classList.add('hidden');
         }
       });
 
@@ -379,6 +397,8 @@ async def fetch_spectra(
 
     client = _build_client(Path(download_dir))
     try:
+
+    def _download_and_parse():
         observations, products, paths, metadata = client.discover_and_download(
             program_id=program_id,
             instrument_name=instrument,
@@ -386,6 +406,37 @@ async def fetch_spectra(
         )
     except JWSTDiscoveryError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        loader = _build_loader(flux, wave)
+        spectra: Dict[str, Spectrum1D] = {}
+        header_metadata: Dict[str, Optional[str]] = {}
+        primary_spectrum_id: Optional[str] = None
+
+        for index, path in enumerate(paths):
+            try:
+                bundle = loader.load(path)
+            except Exception as exc:  # pragma: no cover - defensive against FITS parsing issues
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to load spectrum '{path.name}': {exc}",
+                ) from exc
+            spectra[path.name] = bundle.spectrum
+            if index == 0:
+                header_metadata = {
+                    **{
+                        key: (str(value) if value is not None else None)
+                        for key, value in bundle.header_metadata.items()
+                    },
+                    "round_trip_verified": str(bundle.round_trip_verified),
+                    "primary_product": path.name,
+                }
+                primary_spectrum_id = path.name
+
+        return paths, metadata, spectra, header_metadata, primary_spectrum_id
+
+    paths, metadata, spectra, header_metadata, primary_spectrum_id = await run_in_threadpool(
+        _download_and_parse
+    )
 
     if not paths:
         raise HTTPException(status_code=404, detail="No spectral products were found.")

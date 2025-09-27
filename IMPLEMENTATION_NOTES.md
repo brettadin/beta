@@ -25,6 +25,9 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Related Issues / Tickets:_ N/A
 - _Iteration:_ MAST resilience updates
   - _Summary:_ Hardened the MAST discovery pipeline against transient outages and broadened target-only searches via cone lookups so star-name queries surface spectra when exact matches fail.
+
+- _Iteration:_ Threaded spectrum discovery
+  - _Summary:_ Routed the blocking MAST discovery/download and FITS parsing pipeline through FastAPI's threadpool helper so concurrent API requests no longer stall the event loop.
   - _Related Issues / Tickets:_ N/A
 
 ## Documentation URLs Consulted
@@ -59,6 +62,7 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Additional References:_
     - https://astroquery.readthedocs.io/en/latest/mast/mast_obsquery.html
 
+
 ## Parsed Data Fields with Provenance
 - _Iteration:_ Initial JWST viewer build
   - _Source:_ `Training Documents/Reference Links for app v3.docx`
@@ -82,10 +86,12 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
   - _Source:_ MAST observations/product metadata plus JWST FITS headers parsed through the Specutils loader.
   - _Field:_ Same provenance fields as the CLI viewer, now serialized through the API for the browser shell.
   - _Usage:_ Returned via the `/api/spectra` endpoint to populate the mission table and provenance panel dynamically.
+
 - _Iteration:_ MAST resilience updates
   - _Source:_ Existing MAST observation/product metadata returned by relaxed cone-search discovery.
   - _Field:_ No new fields; the change preserves previous provenance data while ensuring broader target search coverage.
   - _Usage:_ Allows the UI to populate existing panels when spectra are located via the fallback discovery path.
+
 
 ## Validation Steps
 - _Iteration:_ Initial JWST viewer build
@@ -106,6 +112,12 @@ Treat the parsed link list derived from [`Training Documents/Reference Links for
 - _Iteration:_ FastAPI web interface
   - _Checks Performed:_ `PYTHONPATH=src python -m jwst_viewer.webapp --host 127.0.0.1 --port 8000 --help`
   - _Command Output / Evidence:_ FastAPI launcher arguments render, confirming the server entry point.
+
 - _Iteration:_ MAST resilience updates
   - _Checks Performed:_ `pytest`
   - _Command Output / Evidence:_ Test suite passes, confirming spectrum conversions remain stable after the discovery updates.
+
+- _Iteration:_ Threaded spectrum discovery
+  - _Checks Performed:_ Manually issued overlapping `/api/spectra` requests via a browser and `curl` to verify they complete in parallel without stalling the UI.
+  - _Command Output / Evidence:_ Concurrent responses returned promptly with independent payloads, confirming the regression fix.
+

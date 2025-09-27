@@ -237,6 +237,69 @@ class JWSTMastClient:
                     "Relaxed JWST search for program %s still returned no observations.",
                     program_id,
                 )
+        elif len(observations) == 0 and target_name and not program_id:
+            relaxed_message = (
+                "Exact target match '%s' returned no JWST observations; "
+                "broadening the search using wildcard and positional lookups."
+            )
+            message = relaxed_message % target_name
+            logger.warning(message)
+            self._last_query_relaxed_message = message
+
+            wildcard_target = f"{target_name}*"
+            observations = self.discover_observations(
+                target_name=wildcard_target,
+                instrument_name=instrument_name,
+                filters=filters,
+            )
+            if len(observations) == 0:
+                logger.warning(
+                    "Wildcard JWST search for target '%s' returned no observations; "
+                    "attempting positional lookup.",
+                    target_name,
+                )
+                try:
+                    broader_results = Observations.query_object(
+                        target_name, radius="0d0m30s"
+                    )
+                except Exception as exc:  # pragma: no cover - remote lookup guard
+                    logger.warning(
+                        "Positional lookup for target '%s' failed: %s", target_name, exc
+                    )
+                    broader_results = Table()
+
+                filtered_results = broader_results
+                if len(filtered_results) and "obs_collection" in filtered_results.colnames:
+                    filtered_results = filtered_results[
+                        filtered_results["obs_collection"] == "JWST"
+                    ]
+                if len(filtered_results) and "dataproduct_type" in filtered_results.colnames:
+                    filtered_results = filtered_results[
+                        filtered_results["dataproduct_type"] == "spectrum"
+                    ]
+                if instrument_name and "instrument_name" in filtered_results.colnames:
+                    filtered_results = filtered_results[
+                        filtered_results["instrument_name"] == instrument_name
+                    ]
+                if filters and len(filtered_results):
+                    for key, value in filters.items():
+                        if key not in filtered_results.colnames:
+                            continue
+                        if isinstance(value, (list, tuple, set)):
+                            allowed = set(value)
+                            mask = [entry in allowed for entry in filtered_results[key]]
+                            filtered_results = filtered_results[mask]
+                        else:
+                            filtered_results = filtered_results[
+                                filtered_results[key] == value
+                            ]
+
+                observations = filtered_results
+                if len(observations) == 0:
+                    logger.warning(
+                        "Relaxed JWST search for target '%s' still returned no observations.",
+                        target_name,
+                    )
         products = self.discover_products(observations)
         downloaded_paths = self.download_products(products, mrp_only=mrp_only, cache=cache)
         metadata = self.collect_metadata(observations, products, downloaded_paths)
