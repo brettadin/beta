@@ -70,6 +70,7 @@ def _render_shell() -> str:
       a { color: #8bbfff; }
       .checkbox-cell { text-align: center; }
       .status { min-height: 1.5rem; font-size: 0.95rem; color: #8bbfff; }
+      .status.warning { color: #f7e3a3; border-left: 4px solid #f4c95d; background: rgba(244, 201, 93, 0.12); padding: 0.5rem 0.75rem; border-radius: 4px; }
       .hidden { display: none; }
     </style>
   </head>
@@ -99,7 +100,7 @@ def _render_shell() -> str:
           <button type=\"submit\">Fetch spectra</button>
         </form>
         <p id=\"search-status\" class=\"status\"></p>
-        <p id=\"search-warning\" class=\"status hidden\"></p>
+        <p id=\"search-warning\" class=\"status warning hidden\"></p>
       </section>
       <section>
         <div class=\"unit-toggle\">
@@ -189,13 +190,6 @@ def _render_shell() -> str:
           const payload = await response.json();
           handlePayload(payload);
           status.textContent = `Loaded ${payload.spectra.length} spectra.`;
-          if (payload.warning) {
-            warningBanner.textContent = payload.warning;
-            warningBanner.classList.remove('hidden');
-          } else {
-            warningBanner.textContent = '';
-            warningBanner.classList.add('hidden');
-          }
         } catch (error) {
           console.error(error);
           const message = error instanceof Error ? error.message : (typeof error === 'string' ? error : null);
@@ -222,6 +216,14 @@ def _render_shell() -> str:
         spectraPayload = payload.spectra || [];
         primarySpectrumId = payload.primary_spectrum_id || null;
         spectraPayload.forEach((item) => spectraById.set(item.id, item));
+
+        if (payload.warning) {
+          warningBanner.textContent = payload.warning;
+          warningBanner.classList.remove('hidden');
+        } else {
+          warningBanner.textContent = '';
+          warningBanner.classList.add('hidden');
+        }
 
         populateProvenance(payload.provenance_html || '');
         populateMetadata(payload.metadata || []);
