@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from urllib.parse import quote
 from typing import Dict, Iterable, List, Optional
 
 import plotly.graph_objects as go
@@ -16,20 +17,47 @@ from .mast_client import JWSTProductMetadata
 
 def _format_metadata_items(
     metadata: Iterable[JWSTProductMetadata],
-) -> List[Dict[str, Optional[str]]]:
-    return [
-        {
-            "Observation ID": item.observation_id,
-            "Program ID": item.program_id,
-            "Instrument": item.instrument,
-            "Target": item.target_name,
-            "PI": item.proposal_pi,
-            "Collection": item.obs_collection,
-            "Download": str(item.download_path) if item.download_path else item.product_url,
-            "spectrum_id": item.product_filename or (item.download_path.name if item.download_path else None),
-        }
-        for item in metadata
-    ]
+) -> List[Dict[str, object | None]]:
+    formatted: List[Dict[str, object | None]] = []
+    for item in metadata:
+        download_href: Optional[str] = None
+        download_label: Optional[str] = None
+
+        if item.download_path:
+            resolved = item.download_path.resolve()
+            download_href = resolved.as_uri()
+            download_label = resolved.name
+        elif item.product_url:
+            if item.product_url.startswith("mast:"):
+                encoded_uri = quote(item.product_url, safe="")
+                download_href = (
+                    f"https://mast.stsci.edu/api/v0.1/Download/file?uri={encoded_uri}"
+                )
+            else:
+                download_href = item.product_url
+            if item.product_filename:
+                download_label = Path(item.product_filename).name
+            else:
+                download_label = "Download"
+
+        formatted.append(
+            {
+                "Observation ID": item.observation_id,
+                "Program ID": item.program_id,
+                "Instrument": item.instrument,
+                "Target": item.target_name,
+                "PI": item.proposal_pi,
+                "Collection": item.obs_collection,
+                "Download": (
+                    {"href": download_href, "label": download_label}
+                    if download_href
+                    else None
+                ),
+                "spectrum_id": item.product_filename
+                or (item.download_path.name if item.download_path else None),
+            }
+        )
+    return formatted
 
 
 def _serialize_spectrum(
@@ -361,12 +389,12 @@ def render_viewer_html(
 
     function addLinkCell(row, value) {{
       const cell = document.createElement('td');
-      if (value) {{
+      if (value && value.href) {{
         const link = document.createElement('a');
-        link.href = value;
+        link.href = value.href;
         link.target = '_blank';
         link.rel = 'noopener';
-        link.textContent = value;
+        link.textContent = value.label || 'Download';
         cell.appendChild(link);
       }}
       row.appendChild(cell);
