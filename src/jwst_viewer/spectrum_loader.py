@@ -53,8 +53,12 @@ class JWSTSpectrumLoader:
         original_spectral_axis_values = np.array(spectrum.spectral_axis.value, copy=True)
 
         converted = spectrum
+        spectral_equivalencies = None
         if spectrum.flux.unit != self.preferred_flux_unit:
-            converted = converted.to(unit=self.preferred_flux_unit)
+            spectral_equivalencies = u.spectral_density(spectrum.spectral_axis)
+            converted = converted.to(
+                unit=self.preferred_flux_unit, equivalencies=spectral_equivalencies
+            )
         if spectrum.spectral_axis.unit != self.preferred_wave_unit:
             converted = Spectrum1D(
                 flux=converted.flux,
@@ -67,6 +71,7 @@ class JWSTSpectrumLoader:
             original_flux_values=original_flux_values,
             original_spectral_axis_unit=original_spectral_axis_unit,
             original_spectral_axis_values=original_spectral_axis_values,
+            spectral_equivalencies=spectral_equivalencies,
         )
         return converted, verified
 
@@ -78,11 +83,14 @@ class JWSTSpectrumLoader:
         original_flux_values: np.ndarray,
         original_spectral_axis_unit: u.Unit,
         original_spectral_axis_values: np.ndarray,
+        spectral_equivalencies: Optional[u.Equivalency] = None,
         atol: float = 1e-12,
     ) -> bool:
         """Ensure unit conversions round-trip without numerical drift."""
 
-        flux_back = spectrum.flux.to(original_flux_unit).value
+        flux_back = spectrum.flux.to(
+            original_flux_unit, equivalencies=spectral_equivalencies
+        ).value
         spectral_back = spectrum.spectral_axis.to(original_spectral_axis_unit).value
         flux_close = np.allclose(flux_back, original_flux_values, atol=atol, rtol=1e-9)
         spectral_close = np.allclose(
@@ -146,5 +154,6 @@ class JWSTSpectrumLoader:
             original_flux_values=original_flux_values,
             original_spectral_axis_unit=original_spectral_axis_unit,
             original_spectral_axis_values=original_spectral_axis_values,
+            spectral_equivalencies=spectral_equivalencies,
         )
         return converted, verified
